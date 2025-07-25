@@ -236,6 +236,94 @@ def get_current_status():
         })
     return status_list
 
+
+def get_user_work_totals():
+    today = date.today()
+    today_str = today.isoformat()
+    week_start_str = (today - timedelta(days=7)).isoformat()
+    month_start_str = (today - timedelta(days=30)).isoformat()
+
+    totals = {}
+
+    # Bugun
+    q = (
+        db.session.query(
+            StatusLog.username,
+            StatusLog.hostname,
+            func.sum(StatusLog.duration),
+        )
+        .filter(
+            StatusLog.status == "not-afk",
+            func.substr(StatusLog.start_time, 1, 10) == today_str,
+        )
+        .group_by(StatusLog.username, StatusLog.hostname)
+    )
+    for username, hostname, total in q:
+        key = (username, hostname)
+        totals[key] = {
+            "username": username,
+            "hostname": hostname,
+            "daily": int(total or 0),
+            "weekly": 0,
+            "monthly": 0,
+        }
+
+    # Son 7 gun
+    q = (
+        db.session.query(
+            StatusLog.username,
+            StatusLog.hostname,
+            func.sum(StatusLog.duration),
+        )
+        .filter(
+            StatusLog.status == "not-afk",
+            func.substr(StatusLog.start_time, 1, 10) >= week_start_str,
+        )
+        .group_by(StatusLog.username, StatusLog.hostname)
+    )
+    for username, hostname, total in q:
+        key = (username, hostname)
+        item = totals.setdefault(
+            key,
+            {
+                "username": username,
+                "hostname": hostname,
+                "daily": 0,
+                "weekly": 0,
+                "monthly": 0,
+            },
+        )
+        item["weekly"] = int(total or 0)
+
+    # Son 30 gun
+    q = (
+        db.session.query(
+            StatusLog.username,
+            StatusLog.hostname,
+            func.sum(StatusLog.duration),
+        )
+        .filter(
+            StatusLog.status == "not-afk",
+            func.substr(StatusLog.start_time, 1, 10) >= month_start_str,
+        )
+        .group_by(StatusLog.username, StatusLog.hostname)
+    )
+    for username, hostname, total in q:
+        key = (username, hostname)
+        item = totals.setdefault(
+            key,
+            {
+                "username": username,
+                "hostname": hostname,
+                "daily": 0,
+                "weekly": 0,
+                "monthly": 0,
+            },
+        )
+        item["monthly"] = int(total or 0)
+
+    return list(totals.values())
+
 @app.route("/")
 def index():
     status_list = get_current_status()
@@ -285,6 +373,59 @@ def index():
         </tbody>
       </table>
       <a class="btn btn-secondary" href="/api/statuslogs">API: Status Logs</a>
+      <a class="btn btn-primary" href="/reports" style="margin-left:10px">Kullanıcı Raporları</a>
+    </div>
+    </body>
+    </html>
+    """
+    return render_template_string(html)
+
+
+@app.route("/reports")
+def reports():
+    totals = get_user_work_totals()
+    table = ""
+    for row in totals:
+        table += f"""
+        <tr>
+            <td>{row['username']}</td>
+            <td>{row['hostname']}</td>
+            <td>{format_duration(row['daily'])}</td>
+            <td>{format_duration(row['weekly'])}</td>
+            <td>{format_duration(row['monthly'])}</td>
+        </tr>
+        """
+    html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Kullanıcı Raporları</title>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+        <style>
+            body {{ background: #f6f6fa; }}
+            .container {{ max-width: 900px; margin-top: 40px; }}
+            table {{ font-size: 15px; }}
+            h2 {{ margin-bottom: 20px; }}
+        </style>
+    </head>
+    <body>
+    <div class="container">
+      <h2>📝 Kullanıcı Çalışma Süreleri</h2>
+      <table class="table table-bordered table-striped shadow">
+        <thead class="table-dark">
+            <tr>
+                <th>Kullanıcı</th>
+                <th>PC</th>
+                <th>Bugün</th>
+                <th>Son 7 Gün</th>
+                <th>Son 30 Gün</th>
+            </tr>
+        </thead>
+        <tbody>
+            {table}
+        </tbody>
+      </table>
+      <a class="btn btn-secondary" href="/">Geri Dön</a>
     </div>
     </body>
     </html>
