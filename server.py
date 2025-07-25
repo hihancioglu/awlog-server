@@ -1,10 +1,11 @@
 from flask import Flask, request, jsonify, render_template_string
-from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import func
 from datetime import datetime, date, timedelta
 import os
 import threading
 import time
+
+from models import db, WindowLog, StatusLog, ReportLog
 
 app = Flask(__name__)
 
@@ -18,36 +19,7 @@ OFFLINE_MULTIPLIER = int(os.environ.get("OFFLINE_MULTIPLIER", 3))
 MONITOR_INTERVAL = int(os.environ.get("MONITOR_INTERVAL", 60))
 
 monitor_thread = None
-db = SQLAlchemy(app)
-
-class WindowLog(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    hostname = db.Column(db.String(128))
-    username = db.Column(db.String(128))
-    window_title = db.Column(db.String(512))
-    process_name = db.Column(db.String(128))
-    start_time = db.Column(db.String(32))
-    end_time = db.Column(db.String(32))
-    duration = db.Column(db.Integer)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-
-class StatusLog(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    hostname = db.Column(db.String(128))
-    username = db.Column(db.String(128))
-    status = db.Column(db.String(32))  # "afk" veya "not-afk"
-    start_time = db.Column(db.String(32))
-    end_time = db.Column(db.String(32))
-    duration = db.Column(db.Integer)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-
-class ReportLog(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    hostname = db.Column(db.String(128))
-    username = db.Column(db.String(128))
-    ip = db.Column(db.String(64))
-    status = db.Column(db.String(32))  # online/offline/keepalive/afk/not-afk
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+db.init_app(app)
 
 @app.before_first_request
 def setup_db():
