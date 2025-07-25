@@ -11,7 +11,7 @@ import tempfile
 import time
 import queue
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 from pynput import mouse, keyboard
 
 from PyQt5.QtWidgets import QApplication, QWidget, QPushButton, QVBoxLayout, QTextEdit, QLabel
@@ -110,12 +110,26 @@ def log_window_period(window_title, process_name, start_time, end_time):
     log_queue.put(("window", data))
 
 def log_status_period(start_time, end_time, status):
-    duration = int((end_time - start_time).total_seconds())
+    """Queue status logs, splitting periods that cross midnight."""
+    cur_start = start_time
+    while cur_start.date() < end_time.date():
+        midnight = datetime.combine(cur_start.date() + timedelta(days=1), datetime.min.time())
+        duration = int((midnight - cur_start).total_seconds())
+        data = {
+            "status": status,
+            "start_time": cur_start.isoformat(),
+            "end_time": midnight.isoformat(),
+            "duration": duration,
+        }
+        log_queue.put(("status", data))
+        cur_start = midnight
+
+    duration = int((end_time - cur_start).total_seconds())
     data = {
         "status": status,
-        "start_time": start_time.isoformat(),
+        "start_time": cur_start.isoformat(),
         "end_time": end_time.isoformat(),
-        "duration": duration
+        "duration": duration,
     }
     log_queue.put(("status", data))
 
