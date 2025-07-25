@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify, render_template_string
 from flask_sqlalchemy import SQLAlchemy
-from datetime import datetime, timedelta
+from sqlalchemy import func
+from datetime import datetime
 import os
 
 app = Flask(__name__)
@@ -9,6 +10,7 @@ db_path = os.path.join(os.path.dirname(__file__), "data", "awlogs.sqlite")
 os.makedirs(os.path.dirname(db_path), exist_ok=True)
 app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{db_path}"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+SECRET = os.environ.get("SECRET", "UzunVEZorluBirKey2024@!")
 db = SQLAlchemy(app)
 
 class WindowLog(db.Model):
@@ -32,6 +34,14 @@ class StatusLog(db.Model):
     duration = db.Column(db.Integer)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
+class ReportLog(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    hostname = db.Column(db.String(128))
+    username = db.Column(db.String(128))
+    ip = db.Column(db.String(64))
+    status = db.Column(db.String(32))  # online/offline/keepalive
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
 @app.before_first_request
 def setup_db():
     db.create_all()
@@ -39,6 +49,8 @@ def setup_db():
 @app.route("/api/log", methods=["POST"])
 def receive_log():
     data = request.json
+    if data.get("secret") != SECRET:
+        return jsonify({"error": "forbidden"}), 403
     log_type = data.get("log_type")
     hostname = data.get("hostname")
     username = data.get("username")
@@ -73,6 +85,23 @@ def receive_log():
     else:
         return jsonify({"error": "invalid log_type"}), 400
 
+
+@app.route("/report", methods=["POST"])
+def report_status():
+    data = request.json
+    if data.get("secret") != SECRET:
+        return jsonify({"error": "forbidden"}), 403
+    hostname = data.get("hostname")
+    username = data.get("username")
+    ip = data.get("ip")
+    status = data.get("status")
+    if not hostname or not username or not status:
+        return jsonify({"error": "bad_request"}), 400
+    rl = ReportLog(hostname=hostname, username=username, ip=ip, status=status)
+    db.session.add(rl)
+    db.session.commit()
+    return jsonify({"status": "ok"}), 200
+
 @app.route("/api/statuslogs")
 def get_status_logs():
     # Son 50 status kaydı (panel için veya otomasyon için)
@@ -91,16 +120,24 @@ def get_status_logs():
     ])
 
 def get_current_status():
-    # Her kullanıcı/PC için en son status'u getir, son kayıdın tersini göster (güncel durum için)
-    latest = {}
-    q = StatusLog.query.order_by(StatusLog.username, StatusLog.hostname, StatusLog.created_at)
-    for log in q:
-        key = (log.username, log.hostname)
-        if key not in latest or log.created_at > latest[key].created_at:
-            latest[key] = log
+    # Her kullanici ve PC icin en son status kaydini almak icin alt sorgu kullan
+    sub = (
+        db.session.query(
+            StatusLog.username,
+            StatusLog.hostname,
+            func.max(StatusLog.created_at).label("max_created_at")
+        ).group_by(StatusLog.username, StatusLog.hostname)
+    ).subquery()
+
+    q = db.session.query(StatusLog).join(
+        sub,
+        (StatusLog.username == sub.c.username)
+        & (StatusLog.hostname == sub.c.hostname)
+        & (StatusLog.created_at == sub.c.max_created_at)
+    )
 
     status_list = []
-    for (username, hostname), log in latest.items():
+    for log in q:
         # Son logun status'una göre mevcut durumu belirle (tersini göster)
         if log.status == "afk":
             shown_status = "Aktif (not-afk)"
@@ -109,8 +146,8 @@ def get_current_status():
             shown_status = "AFK"
             badge = '<span class="badge bg-warning text-dark">AFK</span>'
         status_list.append({
-            "username": username,
-            "hostname": hostname,
+            "username": log.username,
+            "hostname": log.hostname,
             "status": log.status,
             "shown_status": shown_status,
             "badge": badge,
