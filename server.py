@@ -17,7 +17,7 @@ SECRET = os.environ.get("SECRET", "UzunVEZorluBirKey2024@!")
 KEEPALIVE_INTERVAL = int(os.environ.get("KEEPALIVE_INTERVAL", 120))  # seconds
 OFFLINE_MULTIPLIER = int(os.environ.get("OFFLINE_MULTIPLIER", 3))
 MONITOR_INTERVAL = int(os.environ.get("MONITOR_INTERVAL", 60))
-TIMEZONE_OFFSET = int(os.environ.get("TIMEZONE_OFFSET", 0))  # hours
+TIMEZONE_OFFSET = int(os.environ.get("TIMEZONE_OFFSET", 3))  # hours
 
 def local_now() -> datetime:
     """Return current time adjusted for TIMEZONE_OFFSET."""
