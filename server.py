@@ -271,7 +271,6 @@ def get_current_status():
             .filter(
                 StatusLog.username == log.username,
                 StatusLog.hostname == log.hostname,
-                StatusLog.status == "not-afk",
                 func.substr(StatusLog.start_time, 1, 10) == today_str,
             )
             .scalar()
