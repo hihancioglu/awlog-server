@@ -121,7 +121,7 @@ def get_status_logs():
 
 def get_current_status():
     # Her kullanici ve PC icin en son status kaydini almak icin alt sorgu kullan
-    sub = (
+    status_sub = (
         db.session.query(
             StatusLog.username,
             StatusLog.hostname,
@@ -129,22 +129,49 @@ def get_current_status():
         ).group_by(StatusLog.username, StatusLog.hostname)
     ).subquery()
 
-    q = db.session.query(StatusLog).join(
-        sub,
-        (StatusLog.username == sub.c.username)
-        & (StatusLog.hostname == sub.c.hostname)
-        & (StatusLog.created_at == sub.c.max_created_at)
+    status_q = db.session.query(StatusLog).join(
+        status_sub,
+        (StatusLog.username == status_sub.c.username)
+        & (StatusLog.hostname == status_sub.c.hostname)
+        & (StatusLog.created_at == status_sub.c.max_created_at)
     )
 
+    # En son report (online/offline/keepalive) bilgilerini al
+    report_sub = (
+        db.session.query(
+            ReportLog.username,
+            ReportLog.hostname,
+            func.max(ReportLog.created_at).label("max_created_at")
+        ).group_by(ReportLog.username, ReportLog.hostname)
+    ).subquery()
+
+    report_q = db.session.query(ReportLog).join(
+        report_sub,
+        (ReportLog.username == report_sub.c.username)
+        & (ReportLog.hostname == report_sub.c.hostname)
+        & (ReportLog.created_at == report_sub.c.max_created_at)
+    )
+
+    report_map = {
+        (r.username, r.hostname): {"status": r.status, "created_at": r.created_at}
+        for r in report_q
+    }
+
     status_list = []
-    for log in q:
-        # Son logun status'una göre mevcut durumu belirle (tersini göster)
-        if log.status == "afk":
-            shown_status = "Aktif (not-afk)"
-            badge = '<span class="badge bg-success">Aktif</span>'
+    for log in status_q:
+        pair = (log.username, log.hostname)
+        rep = report_map.get(pair)
+        if rep and rep["status"] == "offline":
+            shown_status = "Offline"
+            badge = '<span class="badge bg-secondary">Offline</span>'
         else:
-            shown_status = "AFK"
-            badge = '<span class="badge bg-warning text-dark">AFK</span>'
+            # Son logun status'una göre mevcut durumu belirle (tersini göster)
+            if log.status == "afk":
+                shown_status = "Aktif (not-afk)"
+                badge = '<span class="badge bg-success">Aktif</span>'
+            else:
+                shown_status = "AFK"
+                badge = '<span class="badge bg-warning text-dark">AFK</span>'
         status_list.append({
             "username": log.username,
             "hostname": log.hostname,
