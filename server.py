@@ -39,7 +39,7 @@ class ReportLog(db.Model):
     hostname = db.Column(db.String(128))
     username = db.Column(db.String(128))
     ip = db.Column(db.String(64))
-    status = db.Column(db.String(32))  # online/offline/keepalive
+    status = db.Column(db.String(32))  # online/offline/keepalive/afk/not-afk
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 @app.before_first_request
@@ -176,9 +176,16 @@ def get_current_status():
         if rep and rep["status"] == "offline":
             shown_status = "Offline"
             badge = '<span class="badge bg-secondary">Offline</span>'
+        elif rep and rep["status"] in ("afk", "not-afk"):
+            if rep["status"] == "afk":
+                shown_status = "AFK"
+                badge = '<span class="badge bg-warning text-dark">AFK</span>'
+            else:
+                shown_status = "Aktif"
+                badge = '<span class="badge bg-success">Aktif</span>'
         else:
             if log.status == "afk":
-                shown_status = "Aktif (not-afk)"
+                shown_status = "Aktif"
                 badge = '<span class="badge bg-success">Aktif</span>'
             else:
                 shown_status = "AFK"
@@ -217,7 +224,7 @@ def index():
             <td>{row['username']}</td>
             <td>{row['hostname']}</td>
             <td>{row['badge']}</td>
-            <td>{row['status']}</td>
+            <td>{row['shown_status']}</td>
             <td>{row['ip']}</td>
             <td>{format_duration(row['today_total'])}</td>
         </tr>
