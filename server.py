@@ -382,6 +382,37 @@ def get_user_work_totals():
 
     return list(totals.values())
 
+def get_today_user_details():
+    """Return today's total, active and AFK times per user."""
+    today_str = local_now().date().isoformat()
+    q = (
+        db.session.query(
+            StatusLog.username,
+            StatusLog.status,
+            func.sum(StatusLog.duration),
+        )
+        .filter(func.substr(StatusLog.start_time, 1, 10) == today_str)
+        .group_by(StatusLog.username, StatusLog.status)
+    )
+    totals = {}
+    for username, status, total in q:
+        item = totals.setdefault(
+            username,
+            {
+                "username": username,
+                "total": 0,
+                "active": 0,
+                "afk": 0,
+            },
+        )
+        total = int(total or 0)
+        item["total"] += total
+        if status == "not-afk":
+            item["active"] = total
+        elif status == "afk":
+            item["afk"] = total
+    return list(totals.values())
+
 @app.route("/")
 def index():
     status_list = get_current_status()
@@ -441,16 +472,15 @@ def index():
 
 @app.route("/reports")
 def reports():
-    totals = get_user_work_totals()
+    details = get_today_user_details()
     table = ""
-    for row in totals:
+    for row in details:
         table += f"""
         <tr>
             <td>{row['username']}</td>
-            <td>{row['hostname']}</td>
-            <td>{format_duration(row['daily'])}</td>
-            <td>{format_duration(row['weekly'])}</td>
-            <td>{format_duration(row['monthly'])}</td>
+            <td>{format_duration(row['total'])}</td>
+            <td>{format_duration(row['active'])}</td>
+            <td>{format_duration(row['afk'])}</td>
         </tr>
         """
     html = f"""
@@ -468,15 +498,14 @@ def reports():
     </head>
     <body>
     <div class="container">
-      <h2>📝 Kullanıcı Çalışma Süreleri</h2>
+      <h2>📝 Bugünkü Kullanıcı Detayları</h2>
       <table class="table table-bordered table-striped shadow">
         <thead class="table-dark">
             <tr>
                 <th>Kullanıcı</th>
-                <th>PC</th>
-                <th>Bugün</th>
-                <th>Son 7 Gün</th>
-                <th>Son 30 Gün</th>
+                <th>Toplam Süre</th>
+                <th>Aktif Zaman</th>
+                <th>AFK Zaman</th>
             </tr>
         </thead>
         <tbody>
