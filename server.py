@@ -159,6 +159,27 @@ def get_current_status():
         & (ReportLog.created_at == report_sub.c.max_created_at)
     )
 
+    # Her kullanici ve bilgisayar icin en son pencere kaydini al
+    window_sub = (
+        db.session.query(
+            WindowLog.username,
+            WindowLog.hostname,
+            func.max(WindowLog.created_at).label("max_created_at")
+        ).group_by(WindowLog.username, WindowLog.hostname)
+    ).subquery()
+
+    window_q = db.session.query(WindowLog).join(
+        window_sub,
+        (WindowLog.username == window_sub.c.username)
+        & (WindowLog.hostname == window_sub.c.hostname)
+        & (WindowLog.created_at == window_sub.c.max_created_at)
+    )
+
+    window_map = {
+        (w.username, w.hostname): w.window_title or ""
+        for w in window_q
+    }
+
     report_map = {
         (r.username, r.hostname): {
             "status": r.status,
@@ -174,22 +195,22 @@ def get_current_status():
         pair = (log.username, log.hostname)
         rep = report_map.get(pair)
         if rep and rep["status"] == "offline":
-            shown_status = "Offline"
+            online_status = "Offline"
             badge = '<span class="badge bg-secondary">Offline</span>'
-        elif rep and rep["status"] in ("afk", "not-afk"):
+        else:
+            online_status = "Online"
+            badge = '<span class="badge bg-success">Online</span>'
+
+        if rep and rep["status"] in ("afk", "not-afk"):
             if rep["status"] == "afk":
                 shown_status = "AFK"
-                badge = '<span class="badge bg-warning text-dark">AFK</span>'
             else:
                 shown_status = "Aktif"
-                badge = '<span class="badge bg-success">Aktif</span>'
         else:
             if log.status == "afk":
                 shown_status = "Aktif"
-                badge = '<span class="badge bg-success">Aktif</span>'
             else:
                 shown_status = "AFK"
-                badge = '<span class="badge bg-warning text-dark">AFK</span>'
 
         total_today = (
             db.session.query(func.sum(StatusLog.duration))
@@ -209,6 +230,7 @@ def get_current_status():
             "status": log.status,
             "shown_status": shown_status,
             "badge": badge,
+            "window_title": window_map.get(pair, ""),
             "ip": rep.get("ip") if rep else "?",
             "today_total": total_today,
         })
@@ -224,6 +246,7 @@ def index():
             <td>{row['username']}</td>
             <td>{row['hostname']}</td>
             <td>{row['badge']}</td>
+            <td>{row['window_title']}</td>
             <td>{row['shown_status']}</td>
             <td>{row['ip']}</td>
             <td>{format_duration(row['today_total'])}</td>
@@ -251,6 +274,7 @@ def index():
                 <th>Kullanıcı</th>
                 <th>PC</th>
                 <th>Durum</th>
+                <th>Aktif Pencere</th>
                 <th>AFK Durumu</th>
                 <th>IP</th>
                 <th>Bugünkü Süre</th>
