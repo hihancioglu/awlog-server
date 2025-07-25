@@ -130,6 +130,7 @@ def on_input(*_args, **_kwargs):
         log_status_period(afk_period_start, afk_period_end, "afk")
         notafk_period_start = afk_period_end
         afk_state = False
+        report_status("not-afk")
 
 def start_listeners():
     mouse.Listener(on_move=on_input, on_click=on_input, on_scroll=on_input).start()
@@ -166,6 +167,7 @@ def logging_thread_func(running_flag, log_callback=None):
             afk_period_start = now
             if log_callback:
                 log_callback("AFK oldu")
+            report_status("afk")
 
         # Pencere değişimi kontrolü
         current_window, current_process = get_active_window_info()
@@ -297,6 +299,7 @@ class MainWindow(QWidget):
                     time.sleep(1)
         if not self.active: return
         report_status("online")
+        report_status("not-afk")
         self.status_label.setText("Durum: Aktif (Evden Çalışma Başladı)")
         self.logla("Online bildirildi, takip başladı.")
 
