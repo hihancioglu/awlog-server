@@ -508,6 +508,114 @@ def reports():
         </tbody>
       </table>
       <a class="btn btn-secondary" href="/">Geri Dön</a>
+      <a class="btn btn-primary" href="/weekly_report" style="margin-left:10px">Haftalık Detay</a>
+    </div>
+    </body>
+    </html>
+    """
+    return render_template_string(html)
+
+
+def get_weekly_report(username: str, week_start: date):
+    """Return daily online/active/afk totals for given user and week."""
+    results = []
+    for i in range(7):
+        day = week_start + timedelta(days=i)
+        day_str = day.isoformat()
+        q = (
+            db.session.query(StatusLog.status, func.sum(StatusLog.duration))
+            .filter(
+                StatusLog.username == username,
+                func.substr(StatusLog.start_time, 1, 10) == day_str,
+            )
+            .group_by(StatusLog.status)
+            .all()
+        )
+        total_online = sum(row[1] or 0 for row in q)
+        active = next((row[1] for row in q if row[0] == "not-afk"), 0) or 0
+        afk = next((row[1] for row in q if row[0] == "afk"), 0) or 0
+        results.append(
+            {
+                "date": day_str,
+                "online": int(total_online),
+                "active": int(active),
+                "afk": int(afk),
+            }
+        )
+    return results
+
+
+@app.route("/weekly_report")
+def weekly_report():
+    usernames = [u[0] for u in db.session.query(StatusLog.username).distinct()]
+    if not usernames:
+        return "No data", 404
+
+    selected_user = request.args.get("username", usernames[0])
+    week_param = request.args.get("week")
+    if week_param:
+        try:
+            week_start = datetime.strptime(week_param + "-1", "%G-W%V-%u").date()
+        except Exception:
+            week_start = date.today() - timedelta(days=date.today().weekday())
+    else:
+        week_start = date.today() - timedelta(days=date.today().weekday())
+        week_param = week_start.strftime("%G-W%V")
+
+    report_rows = get_weekly_report(selected_user, week_start)
+
+    options = "".join(
+        f'<option value="{u}" {"selected" if u == selected_user else ""}>{u}</option>'
+        for u in usernames
+    )
+    table = "".join(
+        f"<tr><td>{r['date']}</td><td>{format_duration(r['online'])}</td><td>{format_duration(r['active'])}</td><td>{format_duration(r['afk'])}</td></tr>"
+        for r in report_rows
+    )
+
+    html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Haftalık Kullanıcı Raporu</title>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+        <style>
+            body {{ background: #f6f6fa; }}
+            .container {{ max-width: 900px; margin-top: 40px; }}
+            table {{ font-size: 15px; }}
+            h2 {{ margin-bottom: 20px; }}
+        </style>
+    </head>
+    <body>
+    <div class="container">
+      <h2>🗓️ Haftalık Kullanıcı Raporu</h2>
+      <form method="get" class="row mb-3">
+        <div class="col">
+          <select name="username" class="form-select">
+            {options}
+          </select>
+        </div>
+        <div class="col">
+          <input type="week" name="week" class="form-control" value="{week_param}">
+        </div>
+        <div class="col">
+          <button class="btn btn-primary" type="submit">Göster</button>
+        </div>
+      </form>
+      <table class="table table-bordered table-striped shadow">
+        <thead class="table-dark">
+          <tr>
+            <th>Tarih</th>
+            <th>Toplam Online</th>
+            <th>Aktif Zaman</th>
+            <th>AFK Zaman</th>
+          </tr>
+        </thead>
+        <tbody>
+          {table}
+        </tbody>
+      </table>
+      <a class="btn btn-secondary" href="/reports">Geri Dön</a>
     </div>
     </body>
     </html>
