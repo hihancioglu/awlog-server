@@ -373,6 +373,14 @@ class MainWindow(QWidget):
             was_online = online
 
     def cleanup(self):
+        global afk_state, afk_period_start, notafk_period_start
+
+        now = datetime.now()
+        if afk_state:
+            log_status_period(afk_period_start, now, "afk")
+        else:
+            log_status_period(notafk_period_start, now, "not-afk")
+
         self.active = False
         report_status("offline")
         kill_all_forticlient_processes()
