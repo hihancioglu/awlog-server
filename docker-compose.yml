@@ -1,0 +1,10 @@
+version: '3.8'
+services:
+  awlog-server:
+    build: .
+    ports:
+      - "5050:5050"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - FLASK_ENV=production
