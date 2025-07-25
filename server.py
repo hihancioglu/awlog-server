@@ -483,8 +483,8 @@ def reports():
             {table}
         </tbody>
       </table>
-      <h3>Haftalık Detaylar</h3>
-      {generate_all_weekly_tables()}
+      <h3>Bugün Online Kullanıcılar</h3>
+      {generate_today_online_table()}
       <a class="btn btn-secondary" href="/">Geri Dön</a>
       <a class="btn btn-primary" href="/weekly_report" style="margin-left:10px">Haftalık Detay</a>
     </div>
@@ -546,6 +546,32 @@ def generate_all_weekly_tables():
             f"<h4>{username}</h4><table class=\"table table-bordered table-striped shadow\"><thead class=\"table-dark\"><tr><th>Tarih</th><th>Toplam Online</th><th>Aktif Zaman</th><th>AFK Zaman</th></tr></thead><tbody>{table_rows}</tbody></table>"
         )
     return "".join(tables)
+
+
+def generate_today_online_table():
+    """Generate HTML table of today's online users."""
+    status_list = get_current_status()
+    rows = []
+    for row in status_list:
+        if "bg-secondary" in row["badge"]:
+            continue  # Skip offline users
+        rows.append(
+            f"<tr><td>{row['username']}</td><td>{row['hostname']}</td>"
+            f"<td>{row['badge']}</td><td>{row['window_title']}</td>"
+            f"<td>{row['shown_status']}</td><td>{row['ip']}</td>"
+            f"<td>{format_duration(row['today_total'])}</td></tr>"
+        )
+    if not rows:
+        return "<p>Bugün çevrimiçi kullanıcı yok.</p>"
+    header = (
+        "<table class=\"table table-bordered table-striped shadow\">"
+        "<thead class=\"table-dark\"><tr>"
+        "<th>Kullanıcı</th><th>PC</th><th>Durum</th>"
+        "<th>Aktif Pencere</th><th>AFK Durumu</th>"
+        "<th>IP</th><th>Bugünkü Süre</th>"
+        "</tr></thead><tbody>"
+    )
+    return header + "".join(rows) + "</tbody></table>"
 
 
 @app.route("/weekly_report")
