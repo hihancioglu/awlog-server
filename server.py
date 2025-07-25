@@ -17,6 +17,11 @@ SECRET = os.environ.get("SECRET", "UzunVEZorluBirKey2024@!")
 KEEPALIVE_INTERVAL = int(os.environ.get("KEEPALIVE_INTERVAL", 120))  # seconds
 OFFLINE_MULTIPLIER = int(os.environ.get("OFFLINE_MULTIPLIER", 3))
 MONITOR_INTERVAL = int(os.environ.get("MONITOR_INTERVAL", 60))
+TIMEZONE_OFFSET = int(os.environ.get("TIMEZONE_OFFSET", 0))  # hours
+
+def local_now() -> datetime:
+    """Return current time adjusted for TIMEZONE_OFFSET."""
+    return datetime.utcnow() + timedelta(hours=TIMEZONE_OFFSET)
 
 monitor_thread = None
 db.init_app(app)
@@ -244,7 +249,7 @@ def get_current_status():
     }
 
     status_list = []
-    today_str = date.today().isoformat()
+    today_str = local_now().date().isoformat()
     for log in status_q:
         pair = (log.username, log.hostname)
         rep = report_map.get(pair)
@@ -291,7 +296,7 @@ def get_current_status():
 
 
 def get_user_work_totals():
-    today = date.today()
+    today = local_now().date()
     today_str = today.isoformat()
     week_start_str = (today - timedelta(days=7)).isoformat()
     month_start_str = (today - timedelta(days=30)).isoformat()
@@ -528,7 +533,8 @@ def get_weekly_reports_for_all(week_start: date):
 
 def generate_all_weekly_tables():
     """Generate HTML tables of weekly reports for all users for current week."""
-    week_start = date.today() - timedelta(days=date.today().weekday())
+    now = local_now().date()
+    week_start = now - timedelta(days=now.weekday())
     all_reports = get_weekly_reports_for_all(week_start)
     tables = []
     for username, rows in all_reports.items():
@@ -554,9 +560,11 @@ def weekly_report():
         try:
             week_start = datetime.strptime(week_param + "-1", "%G-W%V-%u").date()
         except Exception:
-            week_start = date.today() - timedelta(days=date.today().weekday())
+            now = local_now().date()
+            week_start = now - timedelta(days=now.weekday())
     else:
-        week_start = date.today() - timedelta(days=date.today().weekday())
+        now = local_now().date()
+        week_start = now - timedelta(days=now.weekday())
         week_param = week_start.strftime("%G-W%V")
 
     report_rows = get_weekly_report(selected_user, week_start)
