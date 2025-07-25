@@ -478,6 +478,8 @@ def reports():
             {table}
         </tbody>
       </table>
+      <h3>Haftalık Detaylar</h3>
+      {generate_all_weekly_tables()}
       <a class="btn btn-secondary" href="/">Geri Dön</a>
       <a class="btn btn-primary" href="/weekly_report" style="margin-left:10px">Haftalık Detay</a>
     </div>
@@ -514,6 +516,30 @@ def get_weekly_report(username: str, week_start: date):
             }
         )
     return results
+
+def get_weekly_reports_for_all(week_start: date):
+    """Return weekly reports for all users."""
+    usernames = [u[0] for u in db.session.query(StatusLog.username).distinct()]
+    report_map = {}
+    for username in usernames:
+        report_map[username] = get_weekly_report(username, week_start)
+    return report_map
+
+
+def generate_all_weekly_tables():
+    """Generate HTML tables of weekly reports for all users for current week."""
+    week_start = date.today() - timedelta(days=date.today().weekday())
+    all_reports = get_weekly_reports_for_all(week_start)
+    tables = []
+    for username, rows in all_reports.items():
+        table_rows = "".join(
+            f"<tr><td>{r['date']}</td><td>{format_duration(r['online'])}</td><td>{format_duration(r['active'])}</td><td>{format_duration(r['afk'])}</td></tr>"
+            for r in rows
+        )
+        tables.append(
+            f"<h4>{username}</h4><table class=\"table table-bordered table-striped shadow\"><thead class=\"table-dark\"><tr><th>Tarih</th><th>Toplam Online</th><th>Aktif Zaman</th><th>AFK Zaman</th></tr></thead><tbody>{table_rows}</tbody></table>"
+        )
+    return "".join(tables)
 
 
 @app.route("/weekly_report")
