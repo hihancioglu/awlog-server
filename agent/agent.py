@@ -63,7 +63,8 @@ def is_forticlient_running():
         except Exception: pass
     return False
 
-SERVER_URL = "http://baylan-portainer:5050/statuslogs"
+# Ana sunucu adresi. API çağrıları için base URL olarak kullanılır
+SERVER_URL = "http://baylan-portainer:5050"
 FORTICLIENT_CONSOLE_PATH = r"C:\Program Files\Fortinet\FortiClient\FortiClientConsole.exe"
 CHECK_INTERVAL = 30
 SECRET = "UzunVEZorluBirKey2024@!"  # Güvenlik için
@@ -118,7 +119,8 @@ def log_status_period(start_time, end_time, status):
     }
     log_queue.put(("status", data))
 
-def on_input(event):
+def on_input(*_args, **_kwargs):
+    """Her türlü girdi etkinliğinde çağrılır."""
     global last_input_time, afk_state, afk_period_start, notafk_period_start
     now = time.time()
     last_input_time = now
