@@ -3,6 +3,8 @@ from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import func
 from datetime import datetime, date, timedelta
 import os
+import threading
+import time
 
 app = Flask(__name__)
 
@@ -11,6 +13,11 @@ os.makedirs(os.path.dirname(db_path), exist_ok=True)
 app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{db_path}"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 SECRET = os.environ.get("SECRET", "UzunVEZorluBirKey2024@!")
+KEEPALIVE_INTERVAL = int(os.environ.get("KEEPALIVE_INTERVAL", 120))  # seconds
+OFFLINE_MULTIPLIER = int(os.environ.get("OFFLINE_MULTIPLIER", 3))
+MONITOR_INTERVAL = int(os.environ.get("MONITOR_INTERVAL", 60))
+
+monitor_thread = None
 db = SQLAlchemy(app)
 
 class WindowLog(db.Model):
@@ -45,6 +52,10 @@ class ReportLog(db.Model):
 @app.before_first_request
 def setup_db():
     db.create_all()
+    global monitor_thread
+    if monitor_thread is None:
+        monitor_thread = threading.Thread(target=monitor_keepalive, daemon=True)
+        monitor_thread.start()
 
 def format_duration(seconds: int) -> str:
     """Convert seconds to H:MM format."""
@@ -125,6 +136,77 @@ def get_status_logs():
         }
         for log in logs
     ])
+
+
+def monitor_keepalive():
+    """Background thread to mark users offline when keepalive stops."""
+    with app.app_context():
+        threshold = KEEPALIVE_INTERVAL * OFFLINE_MULTIPLIER
+        while True:
+            now = datetime.utcnow()
+
+            sub = (
+                db.session.query(
+                    ReportLog.username,
+                    ReportLog.hostname,
+                    func.max(ReportLog.created_at).label("max_created_at"),
+                )
+                .group_by(ReportLog.username, ReportLog.hostname)
+            ).subquery()
+
+            latest_reports = (
+                db.session.query(ReportLog)
+                .join(
+                    sub,
+                    (ReportLog.username == sub.c.username)
+                    & (ReportLog.hostname == sub.c.hostname)
+                    & (ReportLog.created_at == sub.c.max_created_at),
+                )
+                .all()
+            )
+
+            for rep in latest_reports:
+                if rep.status == "offline":
+                    continue
+                if (now - rep.created_at).total_seconds() <= threshold:
+                    continue
+
+                last_state = (
+                    db.session.query(ReportLog)
+                    .filter(
+                        ReportLog.username == rep.username,
+                        ReportLog.hostname == rep.hostname,
+                        ReportLog.status.in_(["afk", "not-afk"]),
+                        ReportLog.created_at <= rep.created_at,
+                    )
+                    .order_by(ReportLog.created_at.desc())
+                    .first()
+                )
+
+                if last_state:
+                    start_time = last_state.created_at
+                    status = last_state.status
+                    duration = int((rep.created_at - start_time).total_seconds())
+                    sl = StatusLog(
+                        hostname=rep.hostname,
+                        username=rep.username,
+                        status=status,
+                        start_time=start_time.isoformat(),
+                        end_time=rep.created_at.isoformat(),
+                        duration=duration,
+                    )
+                    db.session.add(sl)
+
+                offline = ReportLog(
+                    hostname=rep.hostname,
+                    username=rep.username,
+                    ip=rep.ip,
+                    status="offline",
+                )
+                db.session.add(offline)
+                db.session.commit()
+
+            time.sleep(MONITOR_INTERVAL)
 
 def get_current_status():
     # Her kullanici ve PC icin en son status kaydini almak icin alt sorgu kullan
