@@ -1,7 +1,7 @@
 from flask import Flask, request, jsonify, render_template_string
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import func
-from datetime import datetime
+from datetime import datetime, date, timedelta
 import os
 
 app = Flask(__name__)
@@ -45,6 +45,13 @@ class ReportLog(db.Model):
 @app.before_first_request
 def setup_db():
     db.create_all()
+
+def format_duration(seconds: int) -> str:
+    """Convert seconds to H:MM format."""
+    seconds = int(seconds or 0)
+    hours = seconds // 3600
+    minutes = (seconds % 3600) // 60
+    return f"{hours:d}:{minutes:02d}"
 
 @app.route("/api/log", methods=["POST"])
 def receive_log():
@@ -153,11 +160,16 @@ def get_current_status():
     )
 
     report_map = {
-        (r.username, r.hostname): {"status": r.status, "created_at": r.created_at}
+        (r.username, r.hostname): {
+            "status": r.status,
+            "created_at": r.created_at,
+            "ip": r.ip,
+        }
         for r in report_q
     }
 
     status_list = []
+    today_str = date.today().isoformat()
     for log in status_q:
         pair = (log.username, log.hostname)
         rep = report_map.get(pair)
@@ -165,22 +177,33 @@ def get_current_status():
             shown_status = "Offline"
             badge = '<span class="badge bg-secondary">Offline</span>'
         else:
-            # Son logun status'una göre mevcut durumu belirle (tersini göster)
             if log.status == "afk":
                 shown_status = "Aktif (not-afk)"
                 badge = '<span class="badge bg-success">Aktif</span>'
             else:
                 shown_status = "AFK"
                 badge = '<span class="badge bg-warning text-dark">AFK</span>'
+
+        total_today = (
+            db.session.query(func.sum(StatusLog.duration))
+            .filter(
+                StatusLog.username == log.username,
+                StatusLog.hostname == log.hostname,
+                StatusLog.status == "not-afk",
+                func.substr(StatusLog.start_time, 1, 10) == today_str,
+            )
+            .scalar()
+            or 0
+        )
+
         status_list.append({
             "username": log.username,
             "hostname": log.hostname,
             "status": log.status,
             "shown_status": shown_status,
             "badge": badge,
-            "start_time": log.start_time,
-            "end_time": log.end_time,
-            "created_at": log.created_at
+            "ip": rep.get("ip") if rep else "?",
+            "today_total": total_today,
         })
     return status_list
 
@@ -194,8 +217,9 @@ def index():
             <td>{row['username']}</td>
             <td>{row['hostname']}</td>
             <td>{row['badge']}</td>
-            <td>{row['start_time']}</td>
-            <td>{row['end_time']}</td>
+            <td>{row['status']}</td>
+            <td>{row['ip']}</td>
+            <td>{format_duration(row['today_total'])}</td>
         </tr>
         """
     html = f"""
@@ -220,8 +244,9 @@ def index():
                 <th>Kullanıcı</th>
                 <th>PC</th>
                 <th>Durum</th>
-                <th>Başlangıç</th>
-                <th>Bitiş</th>
+                <th>AFK Durumu</th>
+                <th>IP</th>
+                <th>Bugünkü Süre</th>
             </tr>
         </thead>
         <tbody>
