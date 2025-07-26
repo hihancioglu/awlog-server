@@ -12,8 +12,10 @@
 </head>
 <body>
 <div class="container">
-  <a class="btn btn-secondary mb-3" href="/">Geri Dön</a>
-  <h2>📝 Bugünkü Kullanıcı Detayları</h2>
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="mb-0">📝 Bugünkü Kullanıcı Detayları</h2>
+    <a class="btn btn-secondary" href="/">Geri Dön</a>
+  </div>
   <table class="table table-bordered table-striped shadow">
     <thead class="table-dark">
         <tr>
@@ -34,7 +36,6 @@
         {% endfor %}
     </tbody>
   </table>
-  <a class="btn btn-secondary" href="/">Geri Dön</a>
 </div>
 </body>
 </html>
