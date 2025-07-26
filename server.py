@@ -278,6 +278,29 @@ def get_current_status():
         & (ReportLog.created_at == report_sub.c.max_created_at)
     )
 
+    # En son afk/not-afk bildirimi (durum degisikligi) bilgilerini al
+    state_sub = (
+        db.session.query(
+            ReportLog.username,
+            ReportLog.hostname,
+            func.max(ReportLog.created_at).label("max_created_at"),
+        )
+        .filter(ReportLog.status.in_(["afk", "not-afk"]))
+        .group_by(ReportLog.username, ReportLog.hostname)
+    ).subquery()
+
+    state_q = db.session.query(ReportLog).join(
+        state_sub,
+        (ReportLog.username == state_sub.c.username)
+        & (ReportLog.hostname == state_sub.c.hostname)
+        & (ReportLog.created_at == state_sub.c.max_created_at)
+    )
+
+    state_map = {
+        (r.username, r.hostname): r
+        for r in state_q
+    }
+
     # Her kullanici ve bilgisayar icin en son pencere kaydini al
     window_sub = (
         db.session.query(
@@ -313,6 +336,7 @@ def get_current_status():
     for log in status_q:
         pair = (log.username, log.hostname)
         rep = report_map.get(pair)
+        state = state_map.get(pair)
         if rep and rep["status"] == "offline":
             online_status = "Offline"
             badge = '<span class="badge bg-secondary">Offline</span>'
@@ -341,6 +365,18 @@ def get_current_status():
             .scalar()
             or 0
         )
+
+        # Devam eden donemi de ekle
+        if rep and state and rep["status"] != "offline":
+            try:
+                last_end = datetime.fromisoformat(log.end_time)
+            except Exception:
+                last_end = None
+            start = state.created_at
+            if last_end and last_end > start:
+                start = last_end
+            if start < datetime.utcnow():
+                total_today += int((datetime.utcnow() - start).total_seconds())
 
         status_list.append({
             "username": log.username,
@@ -471,6 +507,58 @@ def get_today_user_details():
             item["active"] = total
         elif status == "afk":
             item["afk"] = total
+
+    # Devam eden donemleri ekle
+    state_sub = (
+        db.session.query(
+            ReportLog.username,
+            func.max(ReportLog.created_at).label("max_created_at"),
+        )
+        .filter(ReportLog.status.in_(["afk", "not-afk"]))
+        .group_by(ReportLog.username)
+    ).subquery()
+
+    state_q = db.session.query(ReportLog).join(
+        state_sub,
+        (ReportLog.username == state_sub.c.username)
+        & (ReportLog.created_at == state_sub.c.max_created_at),
+    )
+
+    rep_sub = (
+        db.session.query(
+            ReportLog.username,
+            func.max(ReportLog.created_at).label("max_created_at"),
+        )
+        .group_by(ReportLog.username)
+    ).subquery()
+
+    rep_q = db.session.query(ReportLog).join(
+        rep_sub,
+        (ReportLog.username == rep_sub.c.username)
+        & (ReportLog.created_at == rep_sub.c.max_created_at),
+    )
+
+    rep_map = {r.username: r.status for r in rep_q}
+
+    now = datetime.utcnow()
+    for st in state_q:
+        item = totals.setdefault(
+            st.username,
+            {
+                "username": st.username,
+                "total": 0,
+                "active": 0,
+                "afk": 0,
+            },
+        )
+        if rep_map.get(st.username) != "offline":
+            delta = int((now - st.created_at).total_seconds())
+            item["total"] += delta
+            if st.status == "not-afk":
+                item["active"] += delta
+            else:
+                item["afk"] += delta
+
     return list(totals.values())
 
 @app.route("/")
