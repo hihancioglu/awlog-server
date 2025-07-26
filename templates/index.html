@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Evden Çalışma Paneli</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background: #f6f6fa; }
+        .container { max-width: 900px; margin-top: 40px; }
+        table { font-size: 15px; }
+        h2 { margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+<div class="container">
+  <h2>🏡 Evden Çalışanlar Durum Paneli</h2>
+  <table class="table table-bordered table-striped shadow">
+    <thead class="table-dark">
+        <tr>
+            <th>Kullanıcı</th>
+            <th>PC</th>
+            <th>Durum</th>
+            <th>Aktif Pencere</th>
+            <th>AFK Durumu</th>
+            <th>IP</th>
+            <th>Bugünkü Süre</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for row in status_list %}
+        <tr>
+            <td>{{ row.username }}</td>
+            <td>{{ row.hostname }}</td>
+            <td>{{ row.badge|safe }}</td>
+            <td>{{ row.window_title }}</td>
+            <td>{{ row.shown_status }}</td>
+            <td>{{ row.ip }}</td>
+            <td>{{ format_duration(row.today_active) }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+  </table>
+  <a class="btn btn-secondary" href="/api/statuslogs">API: Status Logs</a>
+  <a class="btn btn-primary" href="/reports" style="margin-left:10px">Kullanıcı Raporları</a>
+  <a class="btn btn-primary" href="/usage_report" style="margin-left:10px">Kullanım Raporları</a>
+</div>
+</body>
+</html>

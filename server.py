@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, render_template_string
+from flask import Flask, request, jsonify, render_template
 from sqlalchemy import func
 from datetime import datetime, date, timedelta
 import os
@@ -593,59 +593,11 @@ def get_today_user_details():
 @app.route("/")
 def index():
     status_list = get_current_status()
-    table = ""
-    for row in status_list:
-        table += f"""
-        <tr>
-            <td>{row['username']}</td>
-            <td>{row['hostname']}</td>
-            <td>{row['badge']}</td>
-            <td>{row['window_title']}</td>
-            <td>{row['shown_status']}</td>
-            <td>{row['ip']}</td>
-            <td>{format_duration(row['today_active'])}</td>
-        </tr>
-        """
-    html = f"""
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>Evden Çalışma Paneli</title>
-        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-        <style>
-            body {{ background: #f6f6fa; }}
-            .container {{ max-width: 900px; margin-top: 40px; }}
-            table {{ font-size: 15px; }}
-            h2 {{ margin-bottom: 20px; }}
-        </style>
-    </head>
-    <body>
-    <div class="container">
-      <h2>🏡 Evden Çalışanlar Durum Paneli</h2>
-      <table class="table table-bordered table-striped shadow">
-        <thead class="table-dark">
-            <tr>
-                <th>Kullanıcı</th>
-                <th>PC</th>
-                <th>Durum</th>
-                <th>Aktif Pencere</th>
-                <th>AFK Durumu</th>
-                <th>IP</th>
-                <th>Bugünkü Süre</th>
-            </tr>
-        </thead>
-        <tbody>
-            {table}
-        </tbody>
-      </table>
-      <a class="btn btn-secondary" href="/api/statuslogs">API: Status Logs</a>
-      <a class="btn btn-primary" href="/reports" style="margin-left:10px">Kullanıcı Raporları</a>
-      <a class="btn btn-primary" href="/usage_report" style="margin-left:10px">Kullanım Raporları</a>
-    </div>
-    </body>
-    </html>
-    """
-    return render_template_string(html)
+    return render_template(
+        "index.html",
+        status_list=status_list,
+        format_duration=format_duration,
+    )
 
 
 @app.route("/daily_timeline")
@@ -687,108 +639,26 @@ def daily_timeline():
         for i, l in enumerate(logs)
     ]
 
-    options = "".join(
-        f'<option value="{u}" {"selected" if u == selected_user else ""}>{u}</option>'
-        for u in usernames
-    )
-
     import json
     items_json = json.dumps(items)
 
-    html = f"""
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>Günlük Zaman Çizelgesi</title>
-        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-        <link href="https://unpkg.com/vis-timeline@latest/styles/vis-timeline-graph2d.min.css" rel="stylesheet" />
-        <style>
-            body {{ background: #f6f6fa; }}
-            .container {{ max-width: 900px; margin-top: 40px; }}
-            #timeline {{ background: #fff; border: 1px solid #ccc; }}
-            h2 {{ margin-bottom: 20px; }}
-        </style>
-    </head>
-    <body>
-    <div class="container">
-      <h2>📈 Günlük Zaman Çizelgesi</h2>
-      <form method="get" class="row mb-3">
-        <div class="col">
-          <select name="username" class="form-select">
-            {options}
-          </select>
-        </div>
-        <div class="col">
-          <input type="date" name="date" class="form-control" value="{day.isoformat()}">
-        </div>
-        <div class="col">
-          <button class="btn btn-primary" type="submit">Göster</button>
-        </div>
-      </form>
-      <div id="timeline"></div>
-      <a class="btn btn-secondary mt-3" href="/usage_report">Geri Dön</a>
-    </div>
-    <script src="https://unpkg.com/vis-timeline@latest/standalone/umd/vis-timeline-graph2d.min.js"></script>
-    <script>
-      var container = document.getElementById('timeline');
-      var items = new vis.DataSet({items_json});
-      var timeline = new vis.Timeline(container, items, {{ zoomable: true, moveable: true, stack: false }});
-    </script>
-    </body>
-    </html>
-    """
-    return render_template_string(html)
+    return render_template(
+        "daily_timeline.html",
+        usernames=usernames,
+        selected_user=selected_user,
+        day=day,
+        items_json=items_json,
+    )
 
 
 @app.route("/reports")
 def reports():
     details = get_today_user_details()
-    table = ""
-    for row in details:
-        table += f"""
-        <tr>
-            <td>{row['username']}</td>
-            <td>{format_duration(row['total'])}</td>
-            <td>{format_duration(row['active'])}</td>
-            <td>{format_duration(row['afk'])}</td>
-        </tr>
-        """
-    html = f"""
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>Kullanıcı Raporları</title>
-        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-        <style>
-            body {{ background: #f6f6fa; }}
-            .container {{ max-width: 900px; margin-top: 40px; }}
-            table {{ font-size: 15px; }}
-            h2 {{ margin-bottom: 20px; }}
-        </style>
-    </head>
-    <body>
-    <div class="container">
-      <h2>📝 Bugünkü Kullanıcı Detayları</h2>
-      <table class="table table-bordered table-striped shadow">
-        <thead class="table-dark">
-            <tr>
-                <th>Kullanıcı</th>
-                <th>Toplam Süre</th>
-                <th>Aktif Zaman</th>
-                <th>AFK Zaman</th>
-            </tr>
-        </thead>
-        <tbody>
-            {table}
-        </tbody>
-      </table>
-      <a class="btn btn-secondary" href="/">Geri Dön</a>
-      <a class="btn btn-primary" href="/weekly_report" style="margin-left:10px">Haftalık Detay</a>
-    </div>
-    </body>
-    </html>
-    """
-    return render_template_string(html)
+    return render_template(
+        "reports.html",
+        details=details,
+        format_duration=format_duration,
+    )
 
 
 def get_weekly_report(username: str, week_start: date):
@@ -892,63 +762,14 @@ def weekly_report():
 
     report_rows = get_weekly_report(selected_user, week_start)
 
-    options = "".join(
-        f'<option value="{u}" {"selected" if u == selected_user else ""}>{u}</option>'
-        for u in usernames
+    return render_template(
+        "weekly_report.html",
+        usernames=usernames,
+        selected_user=selected_user,
+        week_param=week_param,
+        report_rows=report_rows,
+        format_duration=format_duration,
     )
-    table = "".join(
-        f"<tr><td>{r['date']}</td><td>{format_duration(r['online'])}</td><td>{format_duration(r['active'])}</td><td>{format_duration(r['afk'])}</td></tr>"
-        for r in report_rows
-    )
-
-    html = f"""
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>Haftalık Kullanıcı Raporu</title>
-        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-        <style>
-            body {{ background: #f6f6fa; }}
-            .container {{ max-width: 900px; margin-top: 40px; }}
-            table {{ font-size: 15px; }}
-            h2 {{ margin-bottom: 20px; }}
-        </style>
-    </head>
-    <body>
-    <div class="container">
-      <h2>🗓️ Haftalık Kullanıcı Raporu</h2>
-      <form method="get" class="row mb-3">
-        <div class="col">
-          <select name="username" class="form-select">
-            {options}
-          </select>
-        </div>
-        <div class="col">
-          <input type="week" name="week" class="form-control" value="{week_param}">
-        </div>
-        <div class="col">
-          <button class="btn btn-primary" type="submit">Göster</button>
-        </div>
-      </form>
-      <table class="table table-bordered table-striped shadow">
-        <thead class="table-dark">
-          <tr>
-            <th>Tarih</th>
-            <th>Toplam Online</th>
-            <th>Aktif Zaman</th>
-            <th>AFK Zaman</th>
-          </tr>
-        </thead>
-        <tbody>
-          {table}
-        </tbody>
-      </table>
-      <a class="btn btn-secondary" href="/reports">Geri Dön</a>
-    </div>
-    </body>
-    </html>
-    """
-    return render_template_string(html)
 
 
 @app.route("/usage_report")
@@ -980,80 +801,18 @@ def usage_report():
 
     usage_rows = get_window_usage_data(selected_user, start.isoformat(), end.isoformat())
 
-    options = "".join(
-        f'<option value="{u}" {"selected" if u == selected_user else ""}>{u}</option>'
-        for u in usernames
-    )
-
-    range_opts = {
-        "daily": "",
-        "weekly": "",
-        "monthly": "",
-    }
-    range_opts[range_param] = "selected"
-
-    table = "".join(
-        f"<tr><td>{title}</td><td>{proc}</td><td>{format_duration(dur)}</td></tr>"
-        for title, proc, dur in usage_rows
-    )
-
     timeline_url = f"/daily_timeline?username={selected_user}&date={base_date.isoformat()}"
 
-    html = f"""
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>Kullanım Detayları</title>
-        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-        <style>
-            body {{ background: #f6f6fa; }}
-            .container {{ max-width: 900px; margin-top: 40px; }}
-            table {{ font-size: 15px; }}
-            h2 {{ margin-bottom: 20px; }}
-        </style>
-    </head>
-    <body>
-    <div class="container">
-      <h2>📊 Kullanım Detayları</h2>
-      <a class="btn btn-info mb-3" href="{timeline_url}">Zaman Çizelgesi</a>
-      <form method="get" class="row mb-3">
-        <div class="col">
-          <select name="username" class="form-select">
-            {options}
-          </select>
-        </div>
-        <div class="col">
-          <select name="range" class="form-select">
-            <option value="daily" {range_opts['daily']}>Günlük</option>
-            <option value="weekly" {range_opts['weekly']}>Haftalık</option>
-            <option value="monthly" {range_opts['monthly']}>Aylık</option>
-          </select>
-        </div>
-        <div class="col">
-          <input type="date" name="date" class="form-control" value="{base_date.isoformat()}">
-        </div>
-        <div class="col">
-          <button class="btn btn-primary" type="submit">Göster</button>
-        </div>
-      </form>
-      <table class="table table-bordered table-striped shadow">
-        <thead class="table-dark">
-          <tr>
-            <th>Pencere</th>
-            <th>Process</th>
-            <th>Süre</th>
-          </tr>
-        </thead>
-        <tbody>
-          {table}
-        </tbody>
-      </table>
-      <a class="btn btn-secondary" href="/reports">Geri Dön</a>
-    </div>
-    </body>
-    </html>
-    """
-    return render_template_string(html)
+    return render_template(
+        "usage_report.html",
+        usernames=usernames,
+        selected_user=selected_user,
+        range_param=range_param,
+        base_date=base_date,
+        usage_rows=usage_rows,
+        timeline_url=timeline_url,
+        format_duration=format_duration,
+    )
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5050)
