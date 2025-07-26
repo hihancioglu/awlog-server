@@ -176,26 +176,26 @@ def window_usage():
 
 
 def get_window_usage_data(username: str, start_date: str, end_date: str):
-    """Return aggregated window usage between dates."""
+    """Return window usage grouped by title and process."""
     q = (
         db.session.query(
             WindowLog.window_title,
             WindowLog.process_name,
-            WindowLog.duration,
+            func.sum(WindowLog.duration).label("total_duration"),
         )
         .filter(
             WindowLog.username == username,
             func.substr(WindowLog.start_time, 1, 10) >= start_date,
             func.substr(WindowLog.start_time, 1, 10) <= end_date,
         )
+        .group_by(WindowLog.window_title, WindowLog.process_name)
+        .order_by(func.sum(WindowLog.duration).desc())
     )
 
-    totals = {}
-    for title, proc, duration in q:
-        app_name = get_app_from_window(title or "", proc or "")
-        totals[app_name] = totals.get(app_name, 0) + int(duration or 0)
-
-    return sorted(totals.items(), key=lambda x: x[1], reverse=True)
+    return [
+        (title or "", proc or "", int(dur or 0))
+        for title, proc, dur in q
+    ]
 
 
 def monitor_keepalive():
@@ -901,7 +901,8 @@ def usage_report():
     range_opts[range_param] = "selected"
 
     table = "".join(
-        f"<tr><td>{app}</td><td>{format_duration(dur)}</td></tr>" for app, dur in usage_rows
+        f"<tr><td>{title}</td><td>{proc}</td><td>{format_duration(dur)}</td></tr>"
+        for title, proc, dur in usage_rows
     )
 
     html = f"""
@@ -943,7 +944,8 @@ def usage_report():
       <table class="table table-bordered table-striped shadow">
         <thead class="table-dark">
           <tr>
-            <th>Uygulama/URL</th>
+            <th>Pencere</th>
+            <th>Process</th>
             <th>Süre</th>
           </tr>
         </thead>
