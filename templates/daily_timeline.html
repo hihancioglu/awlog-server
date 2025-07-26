@@ -29,6 +29,13 @@
       <input type="date" name="date" class="form-control" value="{{ day.isoformat() }}">
     </div>
     <div class="col">
+      <select id="zoom-select" class="form-select">
+        <option value="fit">Tüm Gün</option>
+        <option value="1h">Son 1 Saat</option>
+        <option value="15m">Son 15 Dakika</option>
+      </select>
+    </div>
+    <div class="col">
       <button class="btn btn-primary" type="submit">Göster</button>
     </div>
   </form>
@@ -39,6 +46,23 @@
   var container = document.getElementById('timeline');
   var items = new vis.DataSet({{ items_json | safe }});
   var timeline = new vis.Timeline(container, items, { zoomable: true, moveable: true, stack: false });
+
+  function zoomTo(minutes) {
+    var range = timeline.getItemRange();
+    var end = new Date(range.end);
+    var start = new Date(end.getTime() - minutes * 60 * 1000);
+    timeline.setWindow(start, end, { animation: false });
+  }
+
+  document.getElementById('zoom-select').addEventListener('change', function () {
+    if (this.value === '1h') {
+      zoomTo(60);
+    } else if (this.value === '15m') {
+      zoomTo(15);
+    } else {
+      timeline.fit();
+    }
+  });
 </script>
 </body>
 </html>
