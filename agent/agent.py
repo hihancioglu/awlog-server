@@ -260,7 +260,8 @@ class MainWindow(QWidget):
         if hasattr(sys, "_MEIPASS"):
             icon_path = os.path.join(sys._MEIPASS, "remote-work-icon.ico")
         else:
-            icon_path = "remote-work-icon.ico"
+            base_dir = os.path.dirname(os.path.abspath(__file__))
+            icon_path = os.path.join(base_dir, "remote-work-icon.ico")
         self.setWindowIcon(QIcon(icon_path))
         self.resize(480, 380)
 
