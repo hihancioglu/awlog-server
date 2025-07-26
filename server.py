@@ -648,6 +648,98 @@ def index():
     return render_template_string(html)
 
 
+@app.route("/daily_timeline")
+def daily_timeline():
+    """Interactive daily timeline of window usage."""
+    usernames = [u[0] for u in db.session.query(WindowLog.username).distinct()]
+    if not usernames:
+        return "No data", 404
+
+    selected_user = request.args.get("username", usernames[0])
+    date_param = request.args.get("date")
+    today = local_now().date()
+    try:
+        day = datetime.strptime(date_param, "%Y-%m-%d").date() if date_param else today
+    except Exception:
+        day = today
+
+    day_start = day.isoformat()
+    day_end = (day + timedelta(days=1)).isoformat()
+
+    logs = (
+        WindowLog.query
+        .filter(
+            WindowLog.username == selected_user,
+            WindowLog.start_time >= day_start,
+            WindowLog.start_time < day_end,
+        )
+        .order_by(WindowLog.start_time)
+        .all()
+    )
+
+    items = [
+        {
+            "id": i,
+            "content": get_app_from_window(l.window_title or "", l.process_name or ""),
+            "start": l.start_time,
+            "end": l.end_time,
+        }
+        for i, l in enumerate(logs)
+    ]
+
+    options = "".join(
+        f'<option value="{u}" {"selected" if u == selected_user else ""}>{u}</option>'
+        for u in usernames
+    )
+
+    import json
+    items_json = json.dumps(items)
+
+    html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Günlük Zaman Çizelgesi</title>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+        <link href="https://unpkg.com/vis-timeline@latest/styles/vis-timeline-graph2d.min.css" rel="stylesheet" />
+        <style>
+            body {{ background: #f6f6fa; }}
+            .container {{ max-width: 900px; margin-top: 40px; }}
+            #timeline {{ background: #fff; border: 1px solid #ccc; }}
+            h2 {{ margin-bottom: 20px; }}
+        </style>
+    </head>
+    <body>
+    <div class="container">
+      <h2>📈 Günlük Zaman Çizelgesi</h2>
+      <form method="get" class="row mb-3">
+        <div class="col">
+          <select name="username" class="form-select">
+            {options}
+          </select>
+        </div>
+        <div class="col">
+          <input type="date" name="date" class="form-control" value="{day.isoformat()}">
+        </div>
+        <div class="col">
+          <button class="btn btn-primary" type="submit">Göster</button>
+        </div>
+      </form>
+      <div id="timeline"></div>
+      <a class="btn btn-secondary mt-3" href="/usage_report">Geri Dön</a>
+    </div>
+    <script src="https://unpkg.com/vis-timeline@latest/standalone/umd/vis-timeline-graph2d.min.js"></script>
+    <script>
+      var container = document.getElementById('timeline');
+      var items = new vis.DataSet({items_json});
+      var timeline = new vis.Timeline(container, items, {{ zoomable: true, moveable: true, stack: false }});
+    </script>
+    </body>
+    </html>
+    """
+    return render_template_string(html)
+
+
 @app.route("/reports")
 def reports():
     details = get_today_user_details()
