@@ -340,8 +340,8 @@ class MainWindow(QWidget):
                     # Local dosyada tut, örnek amaçlı
                     with open(LOG_PATH, "a", encoding="utf-8") as f:
                         f.write(json.dumps(data, ensure_ascii=False) + "\n")
-                else:
-                    self.logla(f"Log sunucuya iletildi: {log_type}")
+                # Sunucuya iletimin başarılı olduğunu kullanıcı arayüzünde
+                # göstermek gereksiz, bu yüzden ek loglama yapılmaz
             except queue.Empty:
                 continue
             except Exception as e:
