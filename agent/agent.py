@@ -237,12 +237,18 @@ def report_status(status):
         r = requests.post(f"{SERVER_URL}/report", json=data, timeout=5)
     except Exception: pass
 
-def server_accessible():
-    try:
-        r = requests.get(SERVER_URL, timeout=5)
-        return r.status_code == 200 or r.status_code == 404
-    except Exception:
-        return False
+def server_accessible(attempts=2, delay=2):
+    """Check if server is reachable with multiple attempts."""
+    for i in range(attempts):
+        try:
+            r = requests.get(SERVER_URL, timeout=5)
+            if r.status_code in (200, 404):
+                return True
+        except Exception:
+            pass
+        if i < attempts - 1:
+            time.sleep(delay)
+    return False
 
 class MainWindow(QWidget):
     append_log = pyqtSignal(str)
