@@ -49,7 +49,15 @@
 
   function zoomTo(minutes) {
     var range = timeline.getItemRange();
+    if (!range || !range.end) {
+      timeline.fit();
+      return;
+    }
     var end = new Date(range.end);
+    if (isNaN(end.getTime())) {
+      timeline.fit();
+      return;
+    }
     var start = new Date(end.getTime() - minutes * 60 * 1000);
     timeline.setWindow(start, end, { animation: false });
   }
