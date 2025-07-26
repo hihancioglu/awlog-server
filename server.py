@@ -512,8 +512,6 @@ def reports():
             {table}
         </tbody>
       </table>
-      <h3>Bugün Online Kullanıcılar</h3>
-      {generate_today_online_table()}
       <a class="btn btn-secondary" href="/">Geri Dön</a>
       <a class="btn btn-primary" href="/weekly_report" style="margin-left:10px">Haftalık Detay</a>
     </div>
