@@ -41,6 +41,26 @@ def format_duration(seconds: int) -> str:
     minutes = (seconds % 3600) // 60
     return f"{hours:d}:{minutes:02d}"
 
+
+def get_app_from_window(title: str, process: str) -> str:
+    """Return simplified app or domain name from window title and process."""
+    if not title and not process:
+        return "unknown"
+
+    proc = (process or "").lower()
+    if proc.endswith(".exe"):
+        proc = proc[:-4]
+
+    browsers = {"chrome", "msedge", "firefox", "opera", "iexplore"}
+    if proc in browsers:
+        parts = [p.strip() for p in (title or "").split(" - ")]
+        for part in reversed(parts):
+            if "." in part:
+                return part.lower()
+        if parts:
+            return parts[0].lower()
+    return proc or "unknown"
+
 @app.route("/api/log", methods=["POST"])
 def receive_log():
     data = request.json
@@ -113,6 +133,46 @@ def get_status_logs():
         }
         for log in logs
     ])
+
+
+@app.route("/api/window_usage")
+def window_usage():
+    """Return aggregated window usage for a user."""
+    username = request.args.get("username")
+    if not username:
+        return jsonify({"error": "username_required"}), 400
+
+    start_date = request.args.get("start")
+    end_date = request.args.get("end")
+    if not start_date:
+        start_date = local_now().date().isoformat()
+    if not end_date:
+        end_date = start_date
+
+    q = (
+        db.session.query(
+            WindowLog.window_title,
+            WindowLog.process_name,
+            WindowLog.duration,
+            func.substr(WindowLog.start_time, 1, 10).label("day"),
+        )
+        .filter(
+            WindowLog.username == username,
+            func.substr(WindowLog.start_time, 1, 10) >= start_date,
+            func.substr(WindowLog.start_time, 1, 10) <= end_date,
+        )
+    )
+
+    totals = {}
+    for title, proc, duration, day in q:
+        app_name = get_app_from_window(title or "", proc or "")
+        totals[app_name] = totals.get(app_name, 0) + int(duration or 0)
+
+    result = [
+        {"app": app, "duration": dur}
+        for app, dur in sorted(totals.items(), key=lambda x: x[1], reverse=True)
+    ]
+    return jsonify(result)
 
 
 def monitor_keepalive():
