@@ -355,19 +355,25 @@ def get_current_status():
             else:
                 shown_status = "AFK"
 
-        total_today = (
+        active_today = (
             db.session.query(func.sum(StatusLog.duration))
             .filter(
                 StatusLog.username == log.username,
                 StatusLog.hostname == log.hostname,
+                StatusLog.status == "not-afk",
                 func.substr(StatusLog.start_time, 1, 10) == today_str,
             )
             .scalar()
             or 0
         )
 
-        # Devam eden donemi de ekle
-        if rep and state and rep["status"] != "offline":
+        # Devam eden aktif donemi de ekle
+        if (
+            rep
+            and state
+            and rep["status"] != "offline"
+            and state.status == "not-afk"
+        ):
             try:
                 last_end = datetime.fromisoformat(log.end_time)
             except Exception:
@@ -376,7 +382,7 @@ def get_current_status():
             if last_end and last_end > start:
                 start = last_end
             if start < datetime.utcnow():
-                total_today += int((datetime.utcnow() - start).total_seconds())
+                active_today += int((datetime.utcnow() - start).total_seconds())
 
         status_list.append({
             "username": log.username,
@@ -386,7 +392,7 @@ def get_current_status():
             "badge": badge,
             "window_title": window_map.get(pair, ""),
             "ip": rep.get("ip") if rep else "?",
-            "today_total": total_today,
+            "today_active": active_today,
         })
     return status_list
 
@@ -574,7 +580,7 @@ def index():
             <td>{row['window_title']}</td>
             <td>{row['shown_status']}</td>
             <td>{row['ip']}</td>
-            <td>{format_duration(row['today_total'])}</td>
+            <td>{format_duration(row['today_active'])}</td>
         </tr>
         """
     html = f"""
@@ -734,7 +740,7 @@ def generate_today_online_table():
             f"<tr><td>{row['username']}</td><td>{row['hostname']}</td>"
             f"<td>{row['badge']}</td><td>{row['window_title']}</td>"
             f"<td>{row['shown_status']}</td><td>{row['ip']}</td>"
-            f"<td>{format_duration(row['today_total'])}</td></tr>"
+            f"<td>{format_duration(row['today_active'])}</td></tr>"
         )
     if not rows:
         return "<p>Bugün çevrimiçi kullanıcı yok.</p>"
