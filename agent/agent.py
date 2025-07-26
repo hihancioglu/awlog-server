@@ -18,6 +18,9 @@ from PyQt5.QtWidgets import QApplication, QWidget, QPushButton, QVBoxLayout, QTe
 from PyQt5.QtGui import QIcon, QTextCursor
 from PyQt5.QtCore import pyqtSignal, pyqtSlot
 
+# Agent uygulamasının sürüm bilgisi
+AGENT_VERSION = "1.0.0"
+
 # --- TEK INSTANCE GARANTİ: PID kontrollü LOCK FILE ---
 LOCKFILE = os.path.join(tempfile.gettempdir(), "evden_calisma.lock")
 
@@ -255,7 +258,8 @@ class MainWindow(QWidget):
 
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Evden Çalışma Kontrol Paneli")
+        # Pencere başlığına sürüm bilgisini ekle
+        self.setWindowTitle(f"Evden Çalışma Kontrol Paneli v{AGENT_VERSION}")
         # İKON tanımı (hem scriptte hem exe'de çalışır)
         if hasattr(sys, "_MEIPASS"):
             icon_path = os.path.join(sys._MEIPASS, "remote-work-icon.ico")
@@ -271,13 +275,17 @@ class MainWindow(QWidget):
         self.bitir_btn.clicked.connect(self.bitir)
         self.bitir_btn.setEnabled(False)
         self.status_label = QLabel("Durum: Bekleniyor...")
+        self.version_label = QLabel(f"Versiyon: {AGENT_VERSION}")
         self.log = QTextEdit()
         self.log.setReadOnly(True)
+        # Versiyon bilgisini log ekranına da yaz
+        self.log.append(f"Uygulama Versiyonu: {AGENT_VERSION}")
 
         layout = QVBoxLayout()
         layout.addWidget(self.basla_btn)
         layout.addWidget(self.bitir_btn)
         layout.addWidget(self.status_label)
+        layout.addWidget(self.version_label)
         layout.addWidget(self.log)
         self.setLayout(layout)
 
