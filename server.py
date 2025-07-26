@@ -694,6 +694,19 @@ def reports():
     )
 
 
+@app.route("/api/today_totals")
+def api_today_totals():
+    """Return today's totals for active and AFK times."""
+    username = request.args.get("username")
+    details = get_today_user_details()
+    if username:
+        for item in details:
+            if item["username"] == username:
+                return jsonify(item)
+        return jsonify({"error": "not_found"}), 404
+    return jsonify(details)
+
+
 def get_weekly_report(username: str, week_start: date):
     """Return daily online/active/afk totals for given user and week."""
     results = []
