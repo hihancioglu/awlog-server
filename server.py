@@ -390,6 +390,18 @@ def get_current_status():
             or 0
         )
 
+        afk_today = (
+            db.session.query(func.sum(StatusLog.duration))
+            .filter(
+                StatusLog.username == log.username,
+                StatusLog.hostname == log.hostname,
+                StatusLog.status == "afk",
+                func.substr(StatusLog.start_time, 1, 10) == today_str,
+            )
+            .scalar()
+            or 0
+        )
+
         # Devam eden aktif donemi de ekle
         if (
             rep
@@ -407,6 +419,24 @@ def get_current_status():
             if start < datetime.utcnow():
                 active_today += int((datetime.utcnow() - start).total_seconds())
 
+        if (
+            rep
+            and state
+            and rep["status"] != "offline"
+            and state.status == "afk"
+        ):
+            try:
+                last_end = datetime.fromisoformat(log.end_time)
+            except Exception:
+                last_end = None
+            start = state.created_at
+            if last_end and last_end > start:
+                start = last_end
+            if start < datetime.utcnow():
+                afk_today += int((datetime.utcnow() - start).total_seconds())
+
+        total_today = active_today + afk_today
+
         status_list.append({
             "username": log.username,
             "hostname": log.hostname,
@@ -416,6 +446,7 @@ def get_current_status():
             "window_title": window_map.get(pair, ""),
             "ip": rep.get("ip") if rep else "?",
             "today_active": active_today,
+            "today_total": total_today,
         })
     return status_list
 
@@ -728,7 +759,8 @@ def generate_today_online_table():
             f"<tr><td>{row['username']}</td><td>{row['hostname']}</td>"
             f"<td>{row['badge']}</td><td>{row['window_title']}</td>"
             f"<td>{row['shown_status']}</td><td>{row['ip']}</td>"
-            f"<td>{format_duration(row['today_active'])}</td></tr>"
+            f"<td>{format_duration(row['today_active'])}</td>"
+            f"<td>{format_duration(row['today_total'])}</td></tr>"
         )
     if not rows:
         return "<p>Bugün çevrimiçi kullanıcı yok.</p>"
@@ -737,7 +769,7 @@ def generate_today_online_table():
         "<thead class=\"table-dark\"><tr>"
         "<th>Kullanıcı</th><th>PC</th><th>Durum</th>"
         "<th>Aktif Pencere</th><th>AFK Durumu</th>"
-        "<th>IP</th><th>Bugünkü Süre</th>"
+        "<th>IP</th><th>Bugün Aktif</th><th>Bugün Toplam</th>"
         "</tr></thead><tbody>"
     )
     return header + "".join(rows) + "</tbody></table>"

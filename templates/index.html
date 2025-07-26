@@ -22,7 +22,8 @@
             <th>Aktif Pencere</th>
             <th>AFK Durumu</th>
             <th>IP</th>
-            <th>Bugünkü Süre</th>
+            <th>Bugün Aktif</th>
+            <th>Bugün Toplam</th>
         </tr>
     </thead>
     <tbody>
@@ -35,6 +36,7 @@
             <td>{{ row.shown_status }}</td>
             <td>{{ row.ip }}</td>
             <td>{{ format_duration(row.today_active) }}</td>
+            <td>{{ format_duration(row.today_total) }}</td>
         </tr>
         {% endfor %}
     </tbody>
