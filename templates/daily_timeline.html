@@ -77,8 +77,10 @@
     applyZoom(this.value);
   });
 
-  // Apply the selected zoom on initial load
-  applyZoom(zoomSelect.value);
+  // Apply the selected zoom after timeline is rendered
+  setTimeout(function () {
+    applyZoom(zoomSelect.value);
+  }, 100);
 </script>
 </body>
 </html>
