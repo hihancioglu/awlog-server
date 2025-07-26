@@ -29,10 +29,10 @@
       <input type="date" name="date" class="form-control" value="{{ day.isoformat() }}">
     </div>
     <div class="col">
-      <select id="zoom-select" class="form-select">
-        <option value="fit">Tüm Gün</option>
-        <option value="1h">Son 1 Saat</option>
-        <option value="15m">Son 15 Dakika</option>
+      <select id="zoom-select" name="zoom" class="form-select">
+        <option value="fit" {% if zoom_param == 'fit' %}selected{% endif %}>Tüm Gün</option>
+        <option value="1h" {% if zoom_param == '1h' %}selected{% endif %}>Son 1 Saat</option>
+        <option value="15m" {% if zoom_param == '15m' %}selected{% endif %}>Son 15 Dakika</option>
       </select>
     </div>
     <div class="col">
@@ -62,15 +62,23 @@
     timeline.setWindow(start, end, { animation: false });
   }
 
-  document.getElementById('zoom-select').addEventListener('change', function () {
-    if (this.value === '1h') {
+  function applyZoom(value) {
+    if (value === '1h') {
       zoomTo(60);
-    } else if (this.value === '15m') {
+    } else if (value === '15m') {
       zoomTo(15);
     } else {
       timeline.fit();
     }
+  }
+
+  var zoomSelect = document.getElementById('zoom-select');
+  zoomSelect.addEventListener('change', function () {
+    applyZoom(this.value);
   });
+
+  // Apply the selected zoom on initial load
+  applyZoom(zoomSelect.value);
 </script>
 </body>
 </html>

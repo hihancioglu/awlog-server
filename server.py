@@ -609,6 +609,7 @@ def daily_timeline():
 
     selected_user = request.args.get("username", usernames[0])
     date_param = request.args.get("date")
+    zoom_param = request.args.get("zoom", "fit")
     today = local_now().date()
     try:
         day = datetime.strptime(date_param, "%Y-%m-%d").date() if date_param else today
@@ -648,6 +649,7 @@ def daily_timeline():
         selected_user=selected_user,
         day=day,
         items_json=items_json,
+        zoom_param=zoom_param,
     )
 
 
