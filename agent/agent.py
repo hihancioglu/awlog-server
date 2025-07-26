@@ -16,7 +16,7 @@ from pynput import mouse, keyboard
 
 from PyQt5.QtWidgets import QApplication, QWidget, QPushButton, QVBoxLayout, QTextEdit, QLabel
 from PyQt5.QtGui import QIcon, QTextCursor
-from PyQt5.QtCore import pyqtSignal, pyqtSlot
+from PyQt5.QtCore import pyqtSignal, pyqtSlot, QTimer
 
 # Agent uygulamasının sürüm bilgisi
 AGENT_VERSION = "1.0.0"
@@ -78,6 +78,36 @@ afk_timeout = 60  # saniye (AFK için 1dk uygundur)
 log_queue = queue.Queue()
 LOG_PATH = os.path.join(tempfile.gettempdir(), "windowlog.txt")
 
+# --- Bugünü Anlık Aktif/AFK Sayaçları ---
+today_active_seconds = 0
+today_afk_seconds = 0
+
+def format_seconds(sec):
+    sec = int(sec or 0)
+    h = sec // 3600
+    m = (sec % 3600) // 60
+    return f"{h:d}:{m:02d}"
+
+def update_today_counters(start_time, end_time, status):
+    """Aktif ve AFK süre sayaçlarını günceller."""
+    global today_active_seconds, today_afk_seconds
+    today = datetime.now().date()
+    if end_time <= start_time:
+        return
+    if start_time.date() > today or end_time.date() < today:
+        return
+    if start_time.date() < today:
+        start_time = datetime.combine(today, datetime.min.time())
+    if end_time.date() > today:
+        end_time = datetime.combine(today + timedelta(days=1), datetime.min.time())
+    delta = int((end_time - start_time).total_seconds())
+    if delta <= 0:
+        return
+    if status == "not-afk":
+        today_active_seconds += delta
+    elif status == "afk":
+        today_afk_seconds += delta
+
 last_input_time = time.time()
 afk_state = False
 afk_period_start = datetime.now()
@@ -127,6 +157,7 @@ def log_status_period(start_time, end_time, status):
             "duration": duration,
         }
         log_queue.put(("status", data))
+        update_today_counters(cur_start, midnight, status)
         cur_start = midnight
 
     duration = int((end_time - cur_start).total_seconds())
@@ -137,6 +168,7 @@ def log_status_period(start_time, end_time, status):
         "duration": duration,
     }
     log_queue.put(("status", data))
+    update_today_counters(cur_start, end_time, status)
 
 def input_event():
     """Gerçek bir kullanıcı girdisi olduğunda çağrılır."""
@@ -276,6 +308,8 @@ class MainWindow(QWidget):
         self.bitir_btn.setEnabled(False)
         self.status_label = QLabel("Durum: Bekleniyor...")
         self.version_label = QLabel(f"Versiyon: {AGENT_VERSION}")
+        self.active_time_label = QLabel("Bugün Aktif: 0:00")
+        self.afk_time_label = QLabel("Bugün AFK: 0:00")
         self.log = QTextEdit()
         self.log.setReadOnly(True)
         # Versiyon bilgisini log ekranına da yaz
@@ -286,6 +320,8 @@ class MainWindow(QWidget):
         layout.addWidget(self.bitir_btn)
         layout.addWidget(self.status_label)
         layout.addWidget(self.version_label)
+        layout.addWidget(self.active_time_label)
+        layout.addWidget(self.afk_time_label)
         layout.addWidget(self.log)
         self.setLayout(layout)
 
@@ -299,6 +335,12 @@ class MainWindow(QWidget):
 
         self.append_log.connect(self._append_log)
 
+        self.timer = QTimer(self)
+        self.timer.setInterval(1000)
+        self.timer.timeout.connect(self.update_time_labels)
+        self.timer.start()
+        self.update_time_labels()
+
     def logla(self, text):
         self.append_log.emit(text)
 
@@ -306,6 +348,27 @@ class MainWindow(QWidget):
     def _append_log(self, text):
         self.log.append(text)
         self.log.moveCursor(QTextCursor.End)  # Oto-scroll
+
+    def update_time_labels(self):
+        self.active_time_label.setText(f"Bugün Aktif: {format_seconds(today_active_seconds)}")
+        self.afk_time_label.setText(f"Bugün AFK: {format_seconds(today_afk_seconds)}")
+
+    def fetch_today_totals(self):
+        """Sunucudan bugünkü toplamları al."""
+        global today_active_seconds, today_afk_seconds
+        try:
+            r = requests.get(
+                f"{SERVER_URL}/api/today_totals",
+                params={"username": get_username()},
+                timeout=5,
+            )
+            if r.status_code == 200:
+                data = r.json()
+                today_active_seconds = int(data.get("active", 0))
+                today_afk_seconds = int(data.get("afk", 0))
+                self.update_time_labels()
+        except Exception:
+            pass
 
     def baslat(self):
         self.basla_btn.setEnabled(False)
@@ -333,6 +396,7 @@ class MainWindow(QWidget):
         if server_accessible():
             self.status_label.setText("Durum: VPN Bağlı")
             self.logla("VPN zaten bağlı, FortiClient başlatılmayacak.")
+            self.fetch_today_totals()
         else:
             self.status_label.setText("Durum: VPN Bağlantısı Yok")
             self.logla("VPN yok. FortiClient başlatılıyor...")
@@ -348,7 +412,11 @@ class MainWindow(QWidget):
                     if not self.active:
                         return
                     time.sleep(1)
-        if not self.active: return
+        if not self.active:
+            return
+        self.fetch_today_totals()
+        if not self.active:
+            return
         report_status("online")
         report_status("not-afk")
         self.status_label.setText("Durum: Aktif (Evden Çalışma Başladı)")
