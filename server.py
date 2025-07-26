@@ -640,6 +640,7 @@ def index():
       </table>
       <a class="btn btn-secondary" href="/api/statuslogs">API: Status Logs</a>
       <a class="btn btn-primary" href="/reports" style="margin-left:10px">Kullanıcı Raporları</a>
+      <a class="btn btn-primary" href="/usage_report" style="margin-left:10px">Kullanım Raporları</a>
     </div>
     </body>
     </html>
