@@ -997,6 +997,8 @@ def usage_report():
         for title, proc, dur in usage_rows
     )
 
+    timeline_url = f"/daily_timeline?username={selected_user}&date={base_date.isoformat()}"
+
     html = f"""
     <!DOCTYPE html>
     <html>
@@ -1013,6 +1015,7 @@ def usage_report():
     <body>
     <div class="container">
       <h2>📊 Kullanım Detayları</h2>
+      <a class="btn btn-info mb-3" href="{timeline_url}">Zaman Çizelgesi</a>
       <form method="get" class="row mb-3">
         <div class="col">
           <select name="username" class="form-select">
