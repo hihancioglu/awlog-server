@@ -175,6 +175,29 @@ def window_usage():
     return jsonify(result)
 
 
+def get_window_usage_data(username: str, start_date: str, end_date: str):
+    """Return aggregated window usage between dates."""
+    q = (
+        db.session.query(
+            WindowLog.window_title,
+            WindowLog.process_name,
+            WindowLog.duration,
+        )
+        .filter(
+            WindowLog.username == username,
+            func.substr(WindowLog.start_time, 1, 10) >= start_date,
+            func.substr(WindowLog.start_time, 1, 10) <= end_date,
+        )
+    )
+
+    totals = {}
+    for title, proc, duration in q:
+        app_name = get_app_from_window(title or "", proc or "")
+        totals[app_name] = totals.get(app_name, 0) + int(duration or 0)
+
+    return sorted(totals.items(), key=lambda x: x[1], reverse=True)
+
+
 def monitor_keepalive():
     """Background thread to mark users offline when keepalive stops."""
     with app.app_context():
@@ -821,6 +844,106 @@ def weekly_report():
             <th>Toplam Online</th>
             <th>Aktif Zaman</th>
             <th>AFK Zaman</th>
+          </tr>
+        </thead>
+        <tbody>
+          {table}
+        </tbody>
+      </table>
+      <a class="btn btn-secondary" href="/reports">Geri Dön</a>
+    </div>
+    </body>
+    </html>
+    """
+    return render_template_string(html)
+
+
+@app.route("/usage_report")
+def usage_report():
+    usernames = [u[0] for u in db.session.query(WindowLog.username).distinct()]
+    if not usernames:
+        return "No data", 404
+
+    selected_user = request.args.get("username", usernames[0])
+    range_param = request.args.get("range", "daily")
+    date_param = request.args.get("date")
+
+    today = local_now().date()
+    try:
+        base_date = datetime.strptime(date_param, "%Y-%m-%d").date() if date_param else today
+    except Exception:
+        base_date = today
+
+    if range_param == "weekly":
+        start = base_date - timedelta(days=base_date.weekday())
+        end = start + timedelta(days=6)
+    elif range_param == "monthly":
+        start = base_date.replace(day=1)
+        end = (start + timedelta(days=32)).replace(day=1) - timedelta(days=1)
+    else:
+        range_param = "daily"
+        start = base_date
+        end = base_date
+
+    usage_rows = get_window_usage_data(selected_user, start.isoformat(), end.isoformat())
+
+    options = "".join(
+        f'<option value="{u}" {"selected" if u == selected_user else ""}>{u}</option>'
+        for u in usernames
+    )
+
+    range_opts = {
+        "daily": "",
+        "weekly": "",
+        "monthly": "",
+    }
+    range_opts[range_param] = "selected"
+
+    table = "".join(
+        f"<tr><td>{app}</td><td>{format_duration(dur)}</td></tr>" for app, dur in usage_rows
+    )
+
+    html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Kullanım Detayları</title>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+        <style>
+            body {{ background: #f6f6fa; }}
+            .container {{ max-width: 900px; margin-top: 40px; }}
+            table {{ font-size: 15px; }}
+            h2 {{ margin-bottom: 20px; }}
+        </style>
+    </head>
+    <body>
+    <div class="container">
+      <h2>📊 Kullanım Detayları</h2>
+      <form method="get" class="row mb-3">
+        <div class="col">
+          <select name="username" class="form-select">
+            {options}
+          </select>
+        </div>
+        <div class="col">
+          <select name="range" class="form-select">
+            <option value="daily" {range_opts['daily']}>Günlük</option>
+            <option value="weekly" {range_opts['weekly']}>Haftalık</option>
+            <option value="monthly" {range_opts['monthly']}>Aylık</option>
+          </select>
+        </div>
+        <div class="col">
+          <input type="date" name="date" class="form-control" value="{base_date.isoformat()}">
+        </div>
+        <div class="col">
+          <button class="btn btn-primary" type="submit">Göster</button>
+        </div>
+      </form>
+      <table class="table table-bordered table-striped shadow">
+        <thead class="table-dark">
+          <tr>
+            <th>Uygulama/URL</th>
+            <th>Süre</th>
           </tr>
         </thead>
         <tbody>
