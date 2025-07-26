@@ -801,8 +801,6 @@ def usage_report():
 
     usage_rows = get_window_usage_data(selected_user, start.isoformat(), end.isoformat())
 
-    timeline_url = f"/daily_timeline?username={selected_user}&date={base_date.isoformat()}"
-
     return render_template(
         "usage_report.html",
         usernames=usernames,
@@ -810,7 +808,6 @@ def usage_report():
         range_param=range_param,
         base_date=base_date,
         usage_rows=usage_rows,
-        timeline_url=timeline_url,
         format_duration=format_duration,
     )
 
