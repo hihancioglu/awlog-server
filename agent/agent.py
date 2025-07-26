@@ -16,6 +16,7 @@ from pynput import mouse, keyboard
 
 from PyQt5.QtWidgets import QApplication, QWidget, QPushButton, QVBoxLayout, QTextEdit, QLabel
 from PyQt5.QtGui import QIcon, QTextCursor
+from PyQt5.QtCore import pyqtSignal, pyqtSlot
 
 # --- TEK INSTANCE GARANTİ: PID kontrollü LOCK FILE ---
 LOCKFILE = os.path.join(tempfile.gettempdir(), "evden_calisma.lock")
@@ -231,6 +232,8 @@ def server_accessible():
         return False
 
 class MainWindow(QWidget):
+    append_log = pyqtSignal(str)
+
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Evden Çalışma Kontrol Paneli")
@@ -266,7 +269,13 @@ class MainWindow(QWidget):
         self.logging_thread = None
         self.log_sender_thread = None
 
+        self.append_log.connect(self._append_log)
+
     def logla(self, text):
+        self.append_log.emit(text)
+
+    @pyqtSlot(str)
+    def _append_log(self, text):
         self.log.append(text)
         self.log.moveCursor(QTextCursor.End)  # Oto-scroll
 
