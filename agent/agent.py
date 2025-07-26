@@ -81,6 +81,7 @@ afk_period_start = datetime.now()
 notafk_period_start = datetime.now()
 prev_window, prev_process = None, None
 window_period_start = datetime.now()
+pressed_keys = set()
 
 def get_hostname():
     return socket.gethostname()
@@ -134,22 +135,34 @@ def log_status_period(start_time, end_time, status):
     }
     log_queue.put(("status", data))
 
-def on_input(*_args, **_kwargs):
-    """Her türlü girdi etkinliğinde çağrılır."""
+def input_event():
+    """Gerçek bir kullanıcı girdisi olduğunda çağrılır."""
     global last_input_time, afk_state, afk_period_start, notafk_period_start
     now = time.time()
     last_input_time = now
     if afk_state:
-        # AFK'dan çıkıldı, AFK süresini logla
         afk_period_end = datetime.now()
         log_status_period(afk_period_start, afk_period_end, "afk")
         notafk_period_start = afk_period_end
         afk_state = False
         report_status("not-afk")
 
+def on_key_press(key):
+    if key not in pressed_keys:
+        pressed_keys.add(key)
+        input_event()
+
+def on_key_release(key):
+    pressed_keys.discard(key)
+    input_event()
+
 def start_listeners():
-    mouse.Listener(on_move=on_input, on_click=on_input, on_scroll=on_input).start()
-    keyboard.Listener(on_press=on_input).start()
+    mouse.Listener(
+        on_move=lambda *a, **k: input_event(),
+        on_click=lambda *a, **k: input_event(),
+        on_scroll=lambda *a, **k: input_event(),
+    ).start()
+    keyboard.Listener(on_press=on_key_press, on_release=on_key_release).start()
 
 def get_active_window_info():
     try:
