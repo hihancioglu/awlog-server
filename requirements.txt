@@ -1,3 +1,4 @@
 flask==2.2.5
 flask_sqlalchemy==3.0.3
 ldap3==2.9
+python-dotenv
