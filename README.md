@@ -38,6 +38,7 @@ ve uyarı mesajlarını yazar.
 - `REMEMBER_ME_DAYS` – "Beni Hatırla" seçiliyse oturumun geçerli kalacağı gün
   sayısı (varsayılan 30).
 - `LOG_DIR` – Sunucu günlüklerinin yazılacağı klasör (varsayılan `logs`).
+- `DEBUG` – `1` veya `true` ise ek hata ayıklama mesajları loglanır.
 
 ## API Uç Noktaları
 - `POST /api/log` – `log_type` alanı "window" veya "status" olduğunda ilgili verileri kaydeder.

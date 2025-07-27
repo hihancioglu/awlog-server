@@ -20,6 +20,7 @@ import threading
 import time
 import json
 import logging
+from debug_utils import DEBUG
 
 from models import db, WindowLog, StatusLog, ReportLog, ApiLog
 
@@ -141,6 +142,8 @@ def receive_log():
     hostname = data.get("hostname")
     username = data.get("username")
 
+    DEBUG(f"/api/log {log_type} from {username}@{hostname}")
+
     # log all requests including invalid ones
     db.session.add(
         ApiLog(
@@ -195,6 +198,8 @@ def report_status():
     username = data.get("username")
     ip = data.get("ip")
     status = data.get("status")
+
+    DEBUG(f"/report {status} from {username}@{hostname}")
 
     db.session.add(
         ApiLog(
