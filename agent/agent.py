@@ -14,6 +14,8 @@ import json
 from datetime import datetime, timedelta
 from pynput import mouse, keyboard
 
+from debug_utils import DEBUG
+
 from PyQt5.QtWidgets import QApplication, QWidget, QPushButton, QVBoxLayout, QTextEdit, QLabel
 from PyQt5.QtGui import QIcon, QTextCursor
 from PyQt5.QtCore import pyqtSignal, pyqtSlot, QTimer
@@ -128,6 +130,7 @@ def send_log_to_server(log_type, data):
         data['hostname'] = get_hostname()
         data['username'] = get_username()
         data['secret'] = SECRET
+        DEBUG(f"send_log_to_server {log_type} {data.get('window_title') or data.get('status')}")
         response = requests.post(f"{SERVER_URL}/api/log", json=data, timeout=2)
         return response.status_code == 200
     except Exception as e:
@@ -278,6 +281,7 @@ def server_accessible(attempts=2, delay=2):
         try:
             r = requests.get(SERVER_URL, timeout=5)
             if r.status_code in (200, 404):
+                DEBUG("server_accessible ok")
                 return True
         except Exception:
             pass
