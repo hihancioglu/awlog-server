@@ -17,9 +17,21 @@ from pynput import mouse, keyboard
 from PyQt5.QtWidgets import QApplication, QWidget, QPushButton, QVBoxLayout, QTextEdit, QLabel
 from PyQt5.QtGui import QIcon, QTextCursor
 from PyQt5.QtCore import pyqtSignal, pyqtSlot, QTimer
+import logging
 
 # Agent uygulamasının sürüm bilgisi
 AGENT_VERSION = "1.0.0"
+
+# Debugging configuration
+DEBUG = os.environ.get("DEBUG", "0") == "1"
+logging.basicConfig(
+    level=logging.DEBUG if DEBUG else logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+)
+
+def debug_log(msg):
+    if DEBUG:
+        logging.debug(msg)
 
 # --- TEK INSTANCE GARANTİ: PID kontrollü LOCK FILE ---
 LOCKFILE = os.path.join(tempfile.gettempdir(), "evden_calisma.lock")
@@ -77,6 +89,9 @@ SECRET = "UzunVEZorluBirKey2024@!"  # Güvenlik için
 CLIENT_CERT = os.environ.get("CLIENT_CERT")
 CLIENT_KEY = os.environ.get("CLIENT_KEY")
 CA_CERT = os.environ.get("CA_CERT")
+debug_log(f"CLIENT_CERT={CLIENT_CERT}")
+debug_log(f"CLIENT_KEY={CLIENT_KEY}")
+debug_log(f"CA_CERT={CA_CERT}")
 
 def load_cert_from_windows_store():
     """Load computer certificate from LocalMachine\\My store if available."""
@@ -129,6 +144,7 @@ def load_cert_from_windows_store():
 loaded = load_cert_from_windows_store()
 if loaded:
     CLIENT_CERT, CLIENT_KEY = loaded
+    debug_log(f"Loaded cert from store: {CLIENT_CERT}, {CLIENT_KEY}")
 
 # ----- LOG (AFK/AKTİF & PENCERE TAKİBİ) -----
 afk_timeout = 60  # saniye (AFK için 1dk uygundur)
@@ -185,6 +201,9 @@ def send_log_to_server(log_type, data):
         data['hostname'] = get_hostname()
         data['username'] = get_username()
         data['secret'] = SECRET
+        debug_log(
+            f"Sending log to {SERVER_URL}/api/log cert={CLIENT_CERT} key={CLIENT_KEY} ca={CA_CERT}"
+        )
         response = requests.post(
             f"{SERVER_URL}/api/log",
             json=data,
@@ -192,8 +211,10 @@ def send_log_to_server(log_type, data):
             cert=(CLIENT_CERT, CLIENT_KEY) if CLIENT_CERT and CLIENT_KEY else None,
             verify=CA_CERT if CA_CERT else True,
         )
+        debug_log(f"Server response status: {response.status_code}")
         return response.status_code == 200
     except Exception as e:
+        debug_log(f"send_log_to_server error: {e}")
         return False
 
 def log_window_period(window_title, process_name, start_time, end_time):
@@ -332,6 +353,9 @@ def report_status(status):
         "secret": SECRET
     }
     try:
+        debug_log(
+            f"Reporting status {status} to {SERVER_URL}/report cert={CLIENT_CERT} key={CLIENT_KEY} ca={CA_CERT}"
+        )
         r = requests.post(
             f"{SERVER_URL}/report",
             json=data,
@@ -339,22 +363,28 @@ def report_status(status):
             cert=(CLIENT_CERT, CLIENT_KEY) if CLIENT_CERT and CLIENT_KEY else None,
             verify=CA_CERT if CA_CERT else True,
         )
-    except Exception: pass
+        debug_log(f"report_status response: {r.status_code}")
+    except Exception as e:
+        debug_log(f"report_status error: {e}")
 
 def server_accessible(attempts=2, delay=2):
     """Check if server is reachable with multiple attempts."""
     for i in range(attempts):
         try:
+            debug_log(
+                f"Checking server {SERVER_URL} attempt {i+1} cert={CLIENT_CERT} key={CLIENT_KEY} ca={CA_CERT}"
+            )
             r = requests.get(
                 SERVER_URL,
                 timeout=5,
                 cert=(CLIENT_CERT, CLIENT_KEY) if CLIENT_CERT and CLIENT_KEY else None,
                 verify=CA_CERT if CA_CERT else True,
             )
+            debug_log(f"Server responded with status: {r.status_code}")
             if r.status_code in (200, 404):
                 return True
-        except Exception:
-            pass
+        except Exception as e:
+            debug_log(f"server_accessible attempt {i+1} failed: {e}")
         if i < attempts - 1:
             time.sleep(delay)
     return False
