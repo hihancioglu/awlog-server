@@ -18,8 +18,9 @@ from datetime import datetime, date, timedelta
 import os
 import threading
 import time
+import json
 
-from models import db, WindowLog, StatusLog, ReportLog
+from models import db, WindowLog, StatusLog, ReportLog, ApiLog
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "change-me")
@@ -128,6 +129,17 @@ def receive_log():
     hostname = data.get("hostname")
     username = data.get("username")
 
+    # store raw request for auditing
+    db.session.add(
+        ApiLog(
+            endpoint="/api/log",
+            hostname=hostname,
+            username=username,
+            payload=json.dumps(data, ensure_ascii=False),
+        )
+    )
+    db.session.commit()
+
     if log_type == "window":
         wl = WindowLog(
             hostname=hostname,
@@ -168,6 +180,15 @@ def report_status():
     username = data.get("username")
     ip = data.get("ip")
     status = data.get("status")
+    db.session.add(
+        ApiLog(
+            endpoint="/report",
+            hostname=hostname,
+            username=username,
+            payload=json.dumps(data, ensure_ascii=False),
+        )
+    )
+    db.session.commit()
     if not hostname or not username or not status:
         return jsonify({"error": "bad_request"}), 400
     rl = ReportLog(hostname=hostname, username=username, ip=ip, status=status)
@@ -974,6 +995,16 @@ def usage_report():
         usage_rows=usage_rows,
         format_duration=format_duration,
     )
+
+
+@app.route("/api_logs")
+@login_required
+def api_logs():
+    """Display raw API logs."""
+    if not is_admin():
+        return redirect(url_for("index"))
+    logs = ApiLog.query.order_by(ApiLog.created_at.desc()).limit(100).all()
+    return render_template("api_logs.html", logs=logs)
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5050)

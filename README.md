@@ -40,6 +40,7 @@ Sunucu varsayılan olarak 5050 portunda çalışır.
 - `POST /report` – Kullanıcının çevrim içi/çevrim dışı/afk durumunu bildirir.
 - `GET /api/statuslogs` – Son 50 durum kaydını JSON olarak döndürür.
 - `GET /api/window_usage` – Belirtilen kullanıcı için pencere kullanım süresi özetini döndürür.
+- `GET /api_logs` – Tüm API isteklerinin ham loglarını görüntüler (sadece admin).
 
 Ayrıca `/`, `/daily_timeline`, `/weekly_report` ve `/usage_report` gibi HTML sayfaları mevcuttur.
 
