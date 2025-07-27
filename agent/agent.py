@@ -186,11 +186,13 @@ def input_event():
         report_status("not-afk")
 
 def on_key_press(key):
+    """Keyboard press handler that ignores repeated keydown events."""
     if key not in pressed_keys:
         pressed_keys.add(key)
         input_event()
 
 def on_key_release(key):
+    """Keyboard release handler that always counts as activity."""
     pressed_keys.discard(key)
     input_event()
 
@@ -491,6 +493,9 @@ class MainWindow(QWidget):
             else:
                 if self.forticlient_window_shown or not was_online:
                     self.logla("VPN bağlantısı tekrar sağlandı.")
+                if not was_online:
+                    report_status("online")
+                    report_status("afk" if afk_state else "not-afk")
                 self.status_label.setText("Durum: VPN Bağlı")
                 self.forticlient_window_shown = False
             was_online = online
