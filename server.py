@@ -60,6 +60,16 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+@app.template_filter("local_time")
+def local_time(value: datetime, fmt: str = "%Y-%m-%d %H:%M:%S") -> str:
+    """Format a UTC datetime in local time using TIMEZONE_OFFSET."""
+    if not value:
+        return ""
+    if not isinstance(value, datetime):
+        return str(value)
+    local_dt = value + timedelta(hours=TIMEZONE_OFFSET)
+    return local_dt.strftime(fmt)
+
 def local_now() -> datetime:
     """Return current time adjusted for TIMEZONE_OFFSET."""
     return datetime.utcnow() + timedelta(hours=TIMEZONE_OFFSET)
