@@ -68,10 +68,67 @@ def is_forticlient_running():
     return False
 
 # Ana sunucu adresi. API çağrıları için base URL olarak kullanılır
-SERVER_URL = "http://baylan-portainer:5050"
+SERVER_URL = "https://baylan-portainer:5050"
 FORTICLIENT_CONSOLE_PATH = r"C:\Program Files\Fortinet\FortiClient\FortiClientConsole.exe"
 CHECK_INTERVAL = 30
 SECRET = "UzunVEZorluBirKey2024@!"  # Güvenlik için
+
+# TLS ayarları
+CLIENT_CERT = os.environ.get("CLIENT_CERT")
+CLIENT_KEY = os.environ.get("CLIENT_KEY")
+CA_CERT = os.environ.get("CA_CERT")
+
+def load_cert_from_windows_store():
+    """Load computer certificate from LocalMachine\\My store if available."""
+    if os.name != "nt" or (CLIENT_CERT and CLIENT_KEY):
+        return None
+    try:
+        import socket as _socket
+        import base64
+        import tempfile
+        from cryptography.hazmat.primitives.serialization import (
+            pkcs12,
+            Encoding,
+            NoEncryption,
+            PrivateFormat,
+        )
+        import win32com.client
+
+        hostname = _socket.gethostname().lower()
+        target_cn = f"CN={hostname}.baylan.local"
+
+        store = win32com.client.Dispatch("CAPICOM.Store")
+        CAPICOM_LOCAL_MACHINE_STORE = 1
+        CAPICOM_STORE_OPEN_READ_ONLY = 0
+        store.Open(CAPICOM_LOCAL_MACHINE_STORE, "My", CAPICOM_STORE_OPEN_READ_ONLY)
+
+        for cert in store.Certificates:
+            if target_cn.lower() in cert.SubjectName.lower():
+                pfx = cert.Export(0)
+                pfx_bytes = base64.b64decode(pfx)
+                key, crt, _ = pkcs12.load_key_and_certificates(pfx_bytes, None)
+                if key and crt:
+                    cert_file = tempfile.NamedTemporaryFile(delete=False, suffix=".pem")
+                    cert_file.write(crt.public_bytes(Encoding.PEM))
+                    cert_file.close()
+                    key_file = tempfile.NamedTemporaryFile(delete=False, suffix=".pem")
+                    key_file.write(
+                        key.private_bytes(
+                            Encoding.PEM,
+                            PrivateFormat.PKCS8,
+                            NoEncryption(),
+                        )
+                    )
+                    key_file.close()
+                    return cert_file.name, key_file.name
+        store.Close()
+    except Exception:
+        pass
+    return None
+
+loaded = load_cert_from_windows_store()
+if loaded:
+    CLIENT_CERT, CLIENT_KEY = loaded
 
 # ----- LOG (AFK/AKTİF & PENCERE TAKİBİ) -----
 afk_timeout = 60  # saniye (AFK için 1dk uygundur)
@@ -128,7 +185,13 @@ def send_log_to_server(log_type, data):
         data['hostname'] = get_hostname()
         data['username'] = get_username()
         data['secret'] = SECRET
-        response = requests.post(f"{SERVER_URL}/api/log", json=data, timeout=2)
+        response = requests.post(
+            f"{SERVER_URL}/api/log",
+            json=data,
+            timeout=2,
+            cert=(CLIENT_CERT, CLIENT_KEY) if CLIENT_CERT and CLIENT_KEY else None,
+            verify=CA_CERT if CA_CERT else True,
+        )
         return response.status_code == 200
     except Exception as e:
         return False
@@ -269,14 +332,25 @@ def report_status(status):
         "secret": SECRET
     }
     try:
-        r = requests.post(f"{SERVER_URL}/report", json=data, timeout=5)
+        r = requests.post(
+            f"{SERVER_URL}/report",
+            json=data,
+            timeout=5,
+            cert=(CLIENT_CERT, CLIENT_KEY) if CLIENT_CERT and CLIENT_KEY else None,
+            verify=CA_CERT if CA_CERT else True,
+        )
     except Exception: pass
 
 def server_accessible(attempts=2, delay=2):
     """Check if server is reachable with multiple attempts."""
     for i in range(attempts):
         try:
-            r = requests.get(SERVER_URL, timeout=5)
+            r = requests.get(
+                SERVER_URL,
+                timeout=5,
+                cert=(CLIENT_CERT, CLIENT_KEY) if CLIENT_CERT and CLIENT_KEY else None,
+                verify=CA_CERT if CA_CERT else True,
+            )
             if r.status_code in (200, 404):
                 return True
         except Exception:
@@ -361,6 +435,8 @@ class MainWindow(QWidget):
                 f"{SERVER_URL}/api/today_totals",
                 params={"username": get_username()},
                 timeout=5,
+                cert=(CLIENT_CERT, CLIENT_KEY) if CLIENT_CERT and CLIENT_KEY else None,
+                verify=CA_CERT if CA_CERT else True,
             )
             if r.status_code == 200:
                 data = r.json()

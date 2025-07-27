@@ -4,6 +4,7 @@ from datetime import datetime, date, timedelta
 import os
 import threading
 import time
+import ssl
 
 from models import db, WindowLog, StatusLog, ReportLog
 
@@ -18,6 +19,18 @@ KEEPALIVE_INTERVAL = int(os.environ.get("KEEPALIVE_INTERVAL", 120))  # seconds
 OFFLINE_MULTIPLIER = int(os.environ.get("OFFLINE_MULTIPLIER", 3))
 MONITOR_INTERVAL = int(os.environ.get("MONITOR_INTERVAL", 60))
 TIMEZONE_OFFSET = int(os.environ.get("TIMEZONE_OFFSET", 3))  # hours
+
+# SSL/TLS configuration
+SERVER_CERT = os.environ.get("SERVER_CERT")
+SERVER_KEY = os.environ.get("SERVER_KEY")
+CA_CERT = os.environ.get("CA_CERT")
+ssl_context = None
+if SERVER_CERT and SERVER_KEY:
+    ssl_context = ssl.create_default_context(purpose=ssl.Purpose.CLIENT_AUTH)
+    ssl_context.load_cert_chain(certfile=SERVER_CERT, keyfile=SERVER_KEY)
+    if CA_CERT:
+        ssl_context.load_verify_locations(cafile=CA_CERT)
+    ssl_context.verify_mode = ssl.CERT_REQUIRED
 
 def local_now() -> datetime:
     """Return current time adjusted for TIMEZONE_OFFSET."""
@@ -859,4 +872,4 @@ def usage_report():
     )
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5050)
+    app.run(host="0.0.0.0", port=5050, ssl_context=ssl_context)
