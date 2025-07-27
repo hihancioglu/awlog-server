@@ -36,6 +36,8 @@ TIMEZONE_OFFSET = int(os.environ.get("TIMEZONE_OFFSET", 3))  # hours
 LDAP_URI = os.environ.get("LDAP_URI")
 LDAP_BASE_DN = os.environ.get("LDAP_BASE_DN")
 LDAP_DOMAIN = os.environ.get("LDAP_DOMAIN")
+REMEMBER_ME_DAYS = int(os.environ.get("REMEMBER_ME_DAYS", 30))
+app.permanent_session_lifetime = timedelta(days=REMEMBER_ME_DAYS)
 ADMIN_SET = {
     u.strip().lower()
     for u in os.environ.get("ADMIN_USERS", "").split(",")
@@ -689,9 +691,11 @@ def login():
     if request.method == "POST":
         username = request.form.get("username")
         password = request.form.get("password")
+        remember = request.form.get("remember")
         if username and password and ldap_auth(username, password):
             session["user"] = username
             session["is_admin"] = is_admin(username)
+            session.permanent = bool(remember)
             next_url = request.args.get("next") or url_for("index")
             return redirect(next_url)
         flash("Giriş başarısız")
