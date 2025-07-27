@@ -33,6 +33,11 @@ TIMEZONE_OFFSET = int(os.environ.get("TIMEZONE_OFFSET", 3))  # hours
 LDAP_URI = os.environ.get("LDAP_URI")
 LDAP_BASE_DN = os.environ.get("LDAP_BASE_DN")
 LDAP_DOMAIN = os.environ.get("LDAP_DOMAIN")
+ADMIN_SET = {
+    u.strip().lower()
+    for u in os.environ.get("ADMIN_USERS", "").split(",")
+    if u.strip()
+}
 
 def local_now() -> datetime:
     """Return current time adjusted for TIMEZONE_OFFSET."""
@@ -81,6 +86,13 @@ def login_required(func):
         return func(*args, **kwargs)
 
     return wrapper
+
+
+def is_admin(user: str | None = None) -> bool:
+    """Return True if the given or current user is in ADMIN_SET."""
+    if user is None:
+        user = session.get("user")
+    return bool(user and user.lower() in ADMIN_SET)
 
 
 def get_app_from_window(title: str, process: str) -> str:
@@ -159,6 +171,7 @@ def report_status():
     return jsonify({"status": "ok"}), 200
 
 @app.route("/api/statuslogs")
+@login_required
 def get_status_logs():
     # Son 50 status kaydı (panel için veya otomasyon için)
     logs = StatusLog.query.order_by(StatusLog.created_at.desc()).limit(50).all()
@@ -177,11 +190,16 @@ def get_status_logs():
 
 
 @app.route("/api/window_usage")
+@login_required
 def window_usage():
     """Return aggregated window usage for a user."""
     username = request.args.get("username")
     if not username:
+        username = session.get("user")
+    if not username:
         return jsonify({"error": "username_required"}), 400
+    if not is_admin() and username != session.get("user"):
+        return jsonify({"error": "forbidden"}), 403
 
     start_date = request.args.get("start")
     end_date = request.args.get("end")
@@ -670,6 +688,7 @@ def login():
         password = request.form.get("password")
         if username and password and ldap_auth(username, password):
             session["user"] = username
+            session["is_admin"] = is_admin(username)
             next_url = request.args.get("next") or url_for("index")
             return redirect(next_url)
         flash("Giriş başarısız")
@@ -679,12 +698,16 @@ def login():
 @app.route("/logout")
 def logout():
     session.pop("user", None)
+    session.pop("is_admin", None)
     return redirect(url_for("login"))
 
 @app.route("/")
 @login_required
 def index():
     status_list = get_current_status()
+    if not is_admin():
+        user = session.get("user")
+        status_list = [s for s in status_list if s["username"] == user]
     return render_template(
         "index.html",
         status_list=status_list,
@@ -697,10 +720,15 @@ def index():
 def daily_timeline():
     """Interactive daily timeline of window usage."""
     usernames = [u[0] for u in db.session.query(WindowLog.username).distinct()]
+    if not is_admin():
+        current = session.get("user")
+        usernames = [u for u in usernames if u == current]
     if not usernames:
         return "No data", 404
 
     selected_user = request.args.get("username", usernames[0])
+    if not is_admin():
+        selected_user = session.get("user")
     date_param = request.args.get("date")
     zoom_param = request.args.get("zoom", "fit")
     today = local_now().date()
@@ -750,6 +778,9 @@ def daily_timeline():
 @login_required
 def reports():
     details = get_today_user_details()
+    if not is_admin():
+        user = session.get("user")
+        details = [d for d in details if d["username"] == user]
     return render_template(
         "reports.html",
         details=details,
@@ -758,10 +789,14 @@ def reports():
 
 
 @app.route("/api/today_totals")
+@login_required
 def api_today_totals():
     """Return today's totals for active and AFK times."""
     username = request.args.get("username")
     details = get_today_user_details()
+    if not is_admin():
+        current = session.get("user")
+        details = [d for d in details if d["username"] == current]
     if username:
         for item in details:
             if item["username"] == username:
@@ -855,10 +890,15 @@ def generate_today_online_table():
 @login_required
 def weekly_report():
     usernames = [u[0] for u in db.session.query(StatusLog.username).distinct()]
+    if not is_admin():
+        current = session.get("user")
+        usernames = [u for u in usernames if u == current]
     if not usernames:
         return "No data", 404
 
     selected_user = request.args.get("username", usernames[0])
+    if not is_admin():
+        selected_user = session.get("user")
     week_param = request.args.get("week")
     if week_param:
         try:
@@ -887,10 +927,15 @@ def weekly_report():
 @login_required
 def usage_report():
     usernames = [u[0] for u in db.session.query(WindowLog.username).distinct()]
+    if not is_admin():
+        current = session.get("user")
+        usernames = [u for u in usernames if u == current]
     if not usernames:
         return "No data", 404
 
     selected_user = request.args.get("username", usernames[0])
+    if not is_admin():
+        selected_user = session.get("user")
     range_param = request.args.get("range", "daily")
     date_param = request.args.get("date")
 
