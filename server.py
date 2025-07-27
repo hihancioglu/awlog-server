@@ -19,6 +19,7 @@ import os
 import threading
 import time
 import json
+import logging
 
 from models import db, WindowLog, StatusLog, ReportLog, ApiLog
 
@@ -44,6 +45,19 @@ ADMIN_SET = {
     for u in os.environ.get("ADMIN_USERS", "").split(",")
     if u.strip()
 }
+
+# ----- Logging Configuration -----
+LOG_DIR = os.environ.get("LOG_DIR", "logs")
+os.makedirs(LOG_DIR, exist_ok=True)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s: %(message)s",
+    handlers=[
+        logging.FileHandler(os.path.join(LOG_DIR, "server.log")),
+        logging.StreamHandler(),
+    ],
+)
+logger = logging.getLogger(__name__)
 
 def local_now() -> datetime:
     """Return current time adjusted for TIMEZONE_OFFSET."""
@@ -123,13 +137,11 @@ def get_app_from_window(title: str, process: str) -> str:
 @app.route("/api/log", methods=["POST"])
 def receive_log():
     data = request.json
-    if data.get("secret") != SECRET:
-        return jsonify({"error": "forbidden"}), 403
     log_type = data.get("log_type")
     hostname = data.get("hostname")
     username = data.get("username")
 
-    # store raw request for auditing
+    # log all requests including invalid ones
     db.session.add(
         ApiLog(
             endpoint="/api/log",
@@ -139,6 +151,11 @@ def receive_log():
         )
     )
     db.session.commit()
+
+    if data.get("secret") != SECRET:
+        logger.warning("Invalid secret on /api/log from %s@%s", username, hostname)
+        return jsonify({"error": "forbidden"}), 403
+
 
     if log_type == "window":
         wl = WindowLog(
@@ -174,12 +191,11 @@ def receive_log():
 @app.route("/report", methods=["POST"])
 def report_status():
     data = request.json
-    if data.get("secret") != SECRET:
-        return jsonify({"error": "forbidden"}), 403
     hostname = data.get("hostname")
     username = data.get("username")
     ip = data.get("ip")
     status = data.get("status")
+
     db.session.add(
         ApiLog(
             endpoint="/report",
@@ -189,6 +205,10 @@ def report_status():
         )
     )
     db.session.commit()
+
+    if data.get("secret") != SECRET:
+        logger.warning("Invalid secret on /report from %s@%s", username, hostname)
+        return jsonify({"error": "forbidden"}), 403
     if not hostname or not username or not status:
         return jsonify({"error": "bad_request"}), 400
     rl = ReportLog(hostname=hostname, username=username, ip=ip, status=status)

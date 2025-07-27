@@ -26,6 +26,9 @@ Bu depo, evden çalışan kullanıcıların pencere ve AFK durumlarını takip e
 
 Sunucu varsayılan olarak 5050 portunda çalışır.
 
+Başlatıldığında sunucu, `LOG_DIR` altında `server.log` dosyasına hata
+ve uyarı mesajlarını yazar.
+
 ## Ortam Değişkenleri
 - `SECRET` – İstemcilerin gönderdiği istekleri doğrulamak için kullanılan anahtar.
 - `KEEPALIVE_INTERVAL` – Keepalive bildirimlerinin beklenen aralığı (saniye).
@@ -34,6 +37,7 @@ Sunucu varsayılan olarak 5050 portunda çalışır.
 - `TIMEZONE_OFFSET` – Raporlarda kullanılacak saat dilimi ofseti (UTC + değer).
 - `REMEMBER_ME_DAYS` – "Beni Hatırla" seçiliyse oturumun geçerli kalacağı gün
   sayısı (varsayılan 30).
+- `LOG_DIR` – Sunucu günlüklerinin yazılacağı klasör (varsayılan `logs`).
 
 ## API Uç Noktaları
 - `POST /api/log` – `log_type` alanı "window" veya "status" olduğunda ilgili verileri kaydeder.
