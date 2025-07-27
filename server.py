@@ -1,4 +1,15 @@
-from flask import Flask, request, jsonify, render_template
+from flask import (
+    Flask,
+    request,
+    jsonify,
+    render_template,
+    session,
+    redirect,
+    url_for,
+    flash,
+)
+from functools import wraps
+import ldap3
 from sqlalchemy import func
 from datetime import datetime, date, timedelta
 import os
@@ -8,6 +19,7 @@ import time
 from models import db, WindowLog, StatusLog, ReportLog
 
 app = Flask(__name__)
+app.secret_key = os.environ.get("FLASK_SECRET_KEY", "change-me")
 
 db_path = os.path.join(os.path.dirname(__file__), "data", "awlogs.sqlite")
 os.makedirs(os.path.dirname(db_path), exist_ok=True)
@@ -18,6 +30,9 @@ KEEPALIVE_INTERVAL = int(os.environ.get("KEEPALIVE_INTERVAL", 120))  # seconds
 OFFLINE_MULTIPLIER = int(os.environ.get("OFFLINE_MULTIPLIER", 3))
 MONITOR_INTERVAL = int(os.environ.get("MONITOR_INTERVAL", 60))
 TIMEZONE_OFFSET = int(os.environ.get("TIMEZONE_OFFSET", 3))  # hours
+LDAP_URI = os.environ.get("LDAP_URI")
+LDAP_BASE_DN = os.environ.get("LDAP_BASE_DN")
+LDAP_DOMAIN = os.environ.get("LDAP_DOMAIN")
 
 def local_now() -> datetime:
     """Return current time adjusted for TIMEZONE_OFFSET."""
@@ -40,6 +55,32 @@ def format_duration(seconds: int) -> str:
     hours = seconds // 3600
     minutes = (seconds % 3600) // 60
     return f"{hours:d}:{minutes:02d}"
+
+
+def ldap_auth(username: str, password: str) -> bool:
+    """Authenticate user against LDAP/Active Directory."""
+    if not LDAP_URI or not password:
+        return False
+    user_dn = f"{LDAP_DOMAIN}\\{username}" if LDAP_DOMAIN else username
+    try:
+        server = ldap3.Server(LDAP_URI, get_info=ldap3.NONE)
+        conn = ldap3.Connection(server, user=user_dn, password=password, auto_bind=True)
+        conn.unbind()
+        return True
+    except Exception as e:
+        print("LDAP auth failed", e)
+        return False
+
+
+def login_required(func):
+    """Decorator to require login for routes."""
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        if not session.get("user"):
+            return redirect(url_for("login", next=request.path))
+        return func(*args, **kwargs)
+
+    return wrapper
 
 
 def get_app_from_window(title: str, process: str) -> str:
@@ -621,7 +662,27 @@ def get_today_user_details():
 
     return list(totals.values())
 
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        username = request.form.get("username")
+        password = request.form.get("password")
+        if username and password and ldap_auth(username, password):
+            session["user"] = username
+            next_url = request.args.get("next") or url_for("index")
+            return redirect(next_url)
+        flash("Giriş başarısız")
+    return render_template("login.html")
+
+
+@app.route("/logout")
+def logout():
+    session.pop("user", None)
+    return redirect(url_for("login"))
+
 @app.route("/")
+@login_required
 def index():
     status_list = get_current_status()
     return render_template(
@@ -632,6 +693,7 @@ def index():
 
 
 @app.route("/daily_timeline")
+@login_required
 def daily_timeline():
     """Interactive daily timeline of window usage."""
     usernames = [u[0] for u in db.session.query(WindowLog.username).distinct()]
@@ -685,6 +747,7 @@ def daily_timeline():
 
 
 @app.route("/reports")
+@login_required
 def reports():
     details = get_today_user_details()
     return render_template(
@@ -789,6 +852,7 @@ def generate_today_online_table():
 
 
 @app.route("/weekly_report")
+@login_required
 def weekly_report():
     usernames = [u[0] for u in db.session.query(StatusLog.username).distinct()]
     if not usernames:
@@ -820,6 +884,7 @@ def weekly_report():
 
 
 @app.route("/usage_report")
+@login_required
 def usage_report():
     usernames = [u[0] for u in db.session.query(WindowLog.username).distinct()]
     if not usernames:
