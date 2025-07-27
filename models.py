@@ -34,3 +34,14 @@ class ReportLog(db.Model):
     ip = db.Column(db.String(64))
     status = db.Column(db.String(32))  # online/offline/keepalive/afk/not-afk
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class ApiLog(db.Model):
+    """Raw JSON payloads received from API clients."""
+
+    id = db.Column(db.Integer, primary_key=True)
+    endpoint = db.Column(db.String(64))
+    hostname = db.Column(db.String(128))
+    username = db.Column(db.String(128))
+    payload = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
