@@ -460,8 +460,17 @@ class MainWindow(QWidget):
         self.log.moveCursor(QTextCursor.End)  # Oto-scroll
 
     def update_time_labels(self):
-        self.active_time_label.setText(f"Bugün Aktif: {format_seconds(today_active_seconds)}")
-        self.afk_time_label.setText(f"Bugün AFK: {format_seconds(today_afk_seconds)}")
+        """Update active/AFK labels with running totals."""
+        active = today_active_seconds
+        afk = today_afk_seconds
+        now = datetime.now()
+        if self.active:
+            if afk_state:
+                afk += int((now - afk_period_start).total_seconds())
+            else:
+                active += int((now - notafk_period_start).total_seconds())
+        self.active_time_label.setText(f"Bugün Aktif: {format_seconds(active)}")
+        self.afk_time_label.setText(f"Bugün AFK: {format_seconds(afk)}")
 
     def fetch_today_totals(self):
         """Sunucudan bugünkü toplamları al."""
