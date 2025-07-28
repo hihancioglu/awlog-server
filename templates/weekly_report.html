@@ -35,6 +35,8 @@
     <thead class="table-dark">
       <tr>
         <th>Tarih</th>
+        <th>Başlama</th>
+        <th>Bitiş</th>
         <th>Toplam Online</th>
         <th>Aktif Zaman</th>
         <th>AFK Zaman</th>
@@ -44,6 +46,8 @@
       {% for r in report_rows %}
       <tr>
         <td>{{ r.date }}</td>
+        <td>{{ r.start | local_time if r.start }}</td>
+        <td>{{ r.end | local_time if r.end }}</td>
         <td>{{ format_duration(r.online) }}</td>
         <td>{{ format_duration(r.active) }}</td>
         <td>{{ format_duration(r.afk) }}</td>
