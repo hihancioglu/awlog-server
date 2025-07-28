@@ -406,13 +406,13 @@ def monitor_keepalive():
                 if last_state:
                     start_time = last_state.created_at
                     status = last_state.status
-                    duration = int((rep.created_at - start_time).total_seconds())
+                    duration = int((now - start_time).total_seconds())
                     sl = StatusLog(
                         hostname=rep.hostname,
                         username=rep.username,
                         status=status,
                         start_time=start_time.isoformat(),
-                        end_time=rep.created_at.isoformat(),
+                        end_time=now.isoformat(),
                         duration=duration,
                     )
                     db.session.add(sl)
