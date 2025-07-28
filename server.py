@@ -1,8 +1,6 @@
-from dotenv import load_dotenv
-load_dotenv()
+from awlog_server import create_app
 
 from flask import (
-    Flask,
     request,
     jsonify,
     render_template,
@@ -11,11 +9,9 @@ from flask import (
     url_for,
     flash,
 )
-from functools import wraps
-import ldap3
+
 from sqlalchemy import func
 from datetime import datetime, date, timedelta
-import os
 import threading
 import time
 import json
@@ -25,127 +21,27 @@ import hashlib
 import secrets
 from debug_utils import DEBUG
 
-from models import db, WindowLog, StatusLog, ReportLog, ApiLog, AgentSecret
-
-app = Flask(__name__)
-app.secret_key = os.environ.get("FLASK_SECRET_KEY", "change-me")
-
-db_path = os.path.join(os.path.dirname(__file__), "data", "awlogs.sqlite")
-os.makedirs(os.path.dirname(db_path), exist_ok=True)
-app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{db_path}"
-app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-KEEPALIVE_INTERVAL = int(os.environ.get("KEEPALIVE_INTERVAL", 120))  # seconds
-OFFLINE_MULTIPLIER = int(os.environ.get("OFFLINE_MULTIPLIER", 3))
-MONITOR_INTERVAL = int(os.environ.get("MONITOR_INTERVAL", 60))
-TIMEZONE_OFFSET = int(os.environ.get("TIMEZONE_OFFSET", 3))  # hours
-LDAP_URI = os.environ.get("LDAP_URI")
-LDAP_BASE_DN = os.environ.get("LDAP_BASE_DN")
-LDAP_DOMAIN = os.environ.get("LDAP_DOMAIN")
-REMEMBER_ME_DAYS = int(os.environ.get("REMEMBER_ME_DAYS", 30))
-app.permanent_session_lifetime = timedelta(days=REMEMBER_ME_DAYS)
-ADMIN_SET = {
-    u.strip().lower()
-    for u in os.environ.get("ADMIN_USERS", "").split(",")
-    if u.strip()
-}
-
-# ----- Logging Configuration -----
-LOG_DIR = os.environ.get("LOG_DIR", "logs")
-os.makedirs(LOG_DIR, exist_ok=True)
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s %(levelname)s: %(message)s",
-    handlers=[
-        logging.FileHandler(os.path.join(LOG_DIR, "server.log")),
-        logging.StreamHandler(),
-    ],
+from awlog_server.models import db, WindowLog, StatusLog, ReportLog, ApiLog, AgentSecret
+from awlog_server.utils import (
+    local_now,
+    format_duration,
+    ldap_auth,
+    login_required,
+    is_admin,
+    get_app_from_window,
 )
+
+app = create_app()
 logger = logging.getLogger(__name__)
 
-@app.template_filter("local_time")
-def local_time(value: datetime, fmt: str = "%Y-%m-%d %H:%M:%S") -> str:
-    """Format a UTC datetime in local time using TIMEZONE_OFFSET."""
-    if not value:
-        return ""
-    if not isinstance(value, datetime):
-        return str(value)
-    local_dt = value + timedelta(hours=TIMEZONE_OFFSET)
-    return local_dt.strftime(fmt)
-
-def local_now() -> datetime:
-    """Return current time adjusted for TIMEZONE_OFFSET."""
-    return datetime.utcnow() + timedelta(hours=TIMEZONE_OFFSET)
-
 monitor_thread = None
-db.init_app(app)
 
 @app.before_first_request
 def setup_db():
-    db.create_all()
     global monitor_thread
     if monitor_thread is None:
         monitor_thread = threading.Thread(target=monitor_keepalive, daemon=True)
         monitor_thread.start()
-
-def format_duration(seconds: int) -> str:
-    """Convert seconds to H:MM format."""
-    seconds = int(seconds or 0)
-    hours = seconds // 3600
-    minutes = (seconds % 3600) // 60
-    return f"{hours:d}:{minutes:02d}"
-
-
-def ldap_auth(username: str, password: str) -> bool:
-    """Authenticate user against LDAP/Active Directory."""
-    if not LDAP_URI or not password:
-        return False
-    user_dn = f"{LDAP_DOMAIN}\\{username}" if LDAP_DOMAIN else username
-    try:
-        server = ldap3.Server(LDAP_URI, get_info=ldap3.NONE)
-        conn = ldap3.Connection(server, user=user_dn, password=password, auto_bind=True)
-        conn.unbind()
-        return True
-    except Exception as e:
-        print("LDAP auth failed", e)
-        return False
-
-
-def login_required(func):
-    """Decorator to require login for routes."""
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        if not session.get("user"):
-            return redirect(url_for("login", next=request.path))
-        return func(*args, **kwargs)
-
-    return wrapper
-
-
-def is_admin(user: str | None = None) -> bool:
-    """Return True if the given or current user is in ADMIN_SET."""
-    if user is None:
-        user = session.get("user")
-    return bool(user and user.lower() in ADMIN_SET)
-
-
-def get_app_from_window(title: str, process: str) -> str:
-    """Return simplified app or domain name from window title and process."""
-    if not title and not process:
-        return "unknown"
-
-    proc = (process or "").lower()
-    if proc.endswith(".exe"):
-        proc = proc[:-4]
-
-    browsers = {"chrome", "msedge", "firefox", "opera", "iexplore"}
-    if proc in browsers:
-        parts = [p.strip() for p in (title or "").split(" - ")]
-        for part in reversed(parts):
-            if "." in part:
-                return part.lower()
-        if parts:
-            return parts[0].lower()
-    return proc or "unknown"
 
 
 @app.route("/register", methods=["POST"])
@@ -361,7 +257,9 @@ def get_window_usage_data(username: str, start_date: str, end_date: str):
 def monitor_keepalive():
     """Background thread to mark users offline when keepalive stops."""
     with app.app_context():
-        threshold = KEEPALIVE_INTERVAL * OFFLINE_MULTIPLIER
+        threshold = (
+            app.config["KEEPALIVE_INTERVAL"] * app.config["OFFLINE_MULTIPLIER"]
+        )
         while True:
             now = datetime.utcnow()
 
@@ -426,7 +324,7 @@ def monitor_keepalive():
                 db.session.add(offline)
                 db.session.commit()
 
-            time.sleep(MONITOR_INTERVAL)
+            time.sleep(app.config["MONITOR_INTERVAL"])
 
 def get_current_status():
     # Her kullanici ve PC icin en son status kaydini almak icin alt sorgu kullan
