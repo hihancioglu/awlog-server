@@ -50,7 +50,7 @@ ve uyarı mesajlarını yazar.
 Ayrıca `/`, `/daily_timeline`, `/weekly_report` ve `/usage_report` gibi HTML sayfaları mevcuttur.
 
 ## İstemci (Agent)
-`agent` klasörü, Windows için hazırlanmış örnek istemci uygulamasını içerir. Bu istemci; aktif pencere değişimlerini, klavye/fare etkinliklerini ve AFK durumunu tespit ederek düzenli olarak sunucuya gönderir.
+`agent` klasörü, Windows için hazırlanmış örnek istemci uygulamasını içerir. Bu istemci; aktif pencere değişimlerini, klavye/fare etkinliklerini ve AFK durumunu tespit ederek düzenli olarak sunucuya gönderir. VPN bağlantısı `baylan.local` adresine erişilerek kontrol edilir. VPN açık olsa da API sunucusuna ulaşılamazsa arayüzde ayrı bir uyarı gösterilir.
 
 ## Lisans
 Bu proje MIT lisansı ile dağıtılmaktadır.
