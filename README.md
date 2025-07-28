@@ -42,7 +42,8 @@ ve uyarı mesajlarını yazar.
 
 ## API Uç Noktaları
 - `POST /api/log` – `log_type` alanı "window" veya "status" olduğunda ilgili verileri kaydeder.
-- `POST /report` – Kullanıcının çevrim içi/çevrim dışı/afk durumunu bildirir.
+- `POST /report` – Kullanıcının çevrim içi/çevrim dışı/afk durumunu veya güncel pencere bilgisini bildirir.
+  - `status` alanı `window` ise `window_title` ve `process_name` gönderilmelidir.
 - `GET /api/statuslogs` – Son 50 durum kaydını JSON olarak döndürür.
 - `GET /api/window_usage` – Belirtilen kullanıcı için pencere kullanım süresi özetini döndürür.
 - `GET /api_logs` – Tüm API isteklerinin ham loglarını görüntüler (sadece admin).

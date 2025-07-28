@@ -226,7 +226,14 @@ def report_status():
         return jsonify({"error": "forbidden"}), 403
     if not hostname or not username or not status:
         return jsonify({"error": "bad_request"}), 400
-    rl = ReportLog(hostname=hostname, username=username, ip=ip, status=status)
+    rl = ReportLog(
+        hostname=hostname,
+        username=username,
+        ip=ip,
+        status=status,
+        window_title=data.get("window_title"),
+        process_name=data.get("process_name"),
+    )
     db.session.add(rl)
     db.session.commit()
     return jsonify({"status": "ok"}), 200
@@ -444,20 +451,22 @@ def get_current_status():
         for r in state_q
     }
 
-    # Her kullanici ve bilgisayar icin en son pencere kaydini al
+    # Her kullanici ve bilgisayar icin en son pencere bildirimi
     window_sub = (
         db.session.query(
-            WindowLog.username,
-            WindowLog.hostname,
-            func.max(WindowLog.created_at).label("max_created_at")
-        ).group_by(WindowLog.username, WindowLog.hostname)
+            ReportLog.username,
+            ReportLog.hostname,
+            func.max(ReportLog.created_at).label("max_created_at"),
+        )
+        .filter(ReportLog.status == "window")
+        .group_by(ReportLog.username, ReportLog.hostname)
     ).subquery()
 
-    window_q = db.session.query(WindowLog).join(
+    window_q = db.session.query(ReportLog).join(
         window_sub,
-        (WindowLog.username == window_sub.c.username)
-        & (WindowLog.hostname == window_sub.c.hostname)
-        & (WindowLog.created_at == window_sub.c.max_created_at)
+        (ReportLog.username == window_sub.c.username)
+        & (ReportLog.hostname == window_sub.c.hostname)
+        & (ReportLog.created_at == window_sub.c.max_created_at)
     )
 
     window_map = {

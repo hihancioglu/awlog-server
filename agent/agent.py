@@ -238,6 +238,7 @@ def logging_thread_func(running_flag, log_callback=None):
     prev_window, prev_process = get_active_window_info()
     window_period_start = datetime.now()
     notafk_period_start = window_period_start
+    report_window(prev_window, prev_process)
 
     while running_flag.is_set():
         now = datetime.now()
@@ -260,6 +261,7 @@ def logging_thread_func(running_flag, log_callback=None):
             prev_window = current_window
             prev_process = current_process
             window_period_start = now
+            report_window(current_window, current_process)
 
         time.sleep(0.5)
 
@@ -301,6 +303,28 @@ def report_status(status):
         return r.status_code == 200
     except Exception as e:
         DEBUG(f"report_status exception: {e}")
+        return False
+
+def report_window(window_title, process_name):
+    """Send current window information to the server."""
+    data = {
+        "username": getpass.getuser(),
+        "hostname": socket.gethostname(),
+        "ip": get_ip(),
+        "status": "window",
+        "window_title": window_title or "",
+        "process_name": process_name or "",
+        "secret": SECRET,
+    }
+    try:
+        r = requests.post(f"{SERVER_URL}/report", json=data, timeout=5)
+        if r.status_code != 200:
+            DEBUG(
+                f"report_window failed status={r.status_code} resp={r.text.strip()}"
+            )
+        return r.status_code == 200
+    except Exception as e:
+        DEBUG(f"report_window exception: {e}")
         return False
 
 def server_accessible(attempts=2, delay=2):
