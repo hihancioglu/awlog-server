@@ -408,6 +408,7 @@ def vpn_connected():
 
 class MainWindow(QWidget):
     append_log = pyqtSignal(str)
+    show_warning = pyqtSignal(str, str)
 
     def __init__(self):
         super().__init__()
@@ -458,6 +459,7 @@ class MainWindow(QWidget):
         self.server_disconnected_notified = False
 
         self.append_log.connect(self._append_log)
+        self.show_warning.connect(self._show_warning)
 
         self.timer = QTimer(self)
         self.timer.setInterval(1000)
@@ -472,6 +474,10 @@ class MainWindow(QWidget):
     def _append_log(self, text):
         self.log.append(text)
         self.log.moveCursor(QTextCursor.End)  # Oto-scroll
+
+    @pyqtSlot(str, str)
+    def _show_warning(self, title, text):
+        QMessageBox.warning(self, title, text)
 
     def update_time_labels(self):
         """Update active/AFK labels with running totals."""
@@ -700,10 +706,9 @@ class MainWindow(QWidget):
                 self.status_label.setText("Durum: API Sunucusu Yok")
                 self.logla("VPN var ancak API sunucusuna erişilemiyor.")
                 if not self.server_disconnected_notified:
-                    QMessageBox.warning(
-                        self,
+                    self.show_warning.emit(
                         "Bağlantı Hatası",
-                        "Sunucu bağlantısı koptu.",
+                        "Sunucu bağlantısı koptu."
                     )
                     self.server_disconnected_notified = True
                 # Pencere kücültülmüş olsa bile ön plana çıkart
