@@ -18,7 +18,15 @@ from pynput import mouse, keyboard
 
 from debug_utils import DEBUG
 
-from PyQt5.QtWidgets import QApplication, QWidget, QPushButton, QVBoxLayout, QTextEdit, QLabel
+from PyQt5.QtWidgets import (
+    QApplication,
+    QWidget,
+    QPushButton,
+    QVBoxLayout,
+    QTextEdit,
+    QLabel,
+    QMessageBox,
+)
 from PyQt5.QtGui import QIcon, QTextCursor
 from PyQt5.QtCore import pyqtSignal, pyqtSlot, QTimer
 
@@ -446,6 +454,9 @@ class MainWindow(QWidget):
         self.logging_thread = None
         self.log_sender_thread = None
 
+        # Bildirimlerin tekrar etmemesi için durum bayrağı
+        self.server_disconnected_notified = False
+
         self.append_log.connect(self._append_log)
 
         self.timer = QTimer(self)
@@ -688,6 +699,13 @@ class MainWindow(QWidget):
             elif not server_ok:
                 self.status_label.setText("Durum: API Sunucusu Yok")
                 self.logla("VPN var ancak API sunucusuna erişilemiyor.")
+                if not self.server_disconnected_notified:
+                    QMessageBox.warning(
+                        self,
+                        "Bağlantı Hatası",
+                        "Sunucu bağlantısı koptu.",
+                    )
+                    self.server_disconnected_notified = True
                 # Pencere kücültülmüş olsa bile ön plana çıkart
                 self.showNormal()
                 self.raise_()
@@ -703,6 +721,7 @@ class MainWindow(QWidget):
                         self.logla("Durum bilgisi sunucuya iletilemedi.")
                 self.status_label.setText("Durum: VPN Bağlı")
                 self.forticlient_window_shown = False
+                self.server_disconnected_notified = False
             was_vpn = vpn_ok
             was_server = server_ok
 
