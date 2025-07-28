@@ -618,16 +618,22 @@ class MainWindow(QWidget):
 
     def keepalive(self):
         while self.active:
-            for _ in range(120):  # 120 saniye = 2 dk
+            for _ in range(60):  # 60 saniye = 1 dk
                 if not self.active:
                     return
                 time.sleep(1)
             if not self.active:
                 return
-            if report_status("keepalive"):
-                self.logla("Keepalive gönderildi.")
+            sent_keepalive = report_status("keepalive")
+            sent_notafk = report_status("not-afk")
+            if sent_keepalive and sent_notafk:
+                self.logla("Keepalive ve not-afk gönderildi.")
+            elif sent_keepalive:
+                self.logla("Keepalive gönderildi ancak not-afk iletilemedi.")
+            elif sent_notafk:
+                self.logla("not-afk gönderildi ancak keepalive iletilemedi.")
             else:
-                self.logla("Keepalive gönderilemedi.")
+                self.logla("Keepalive ve not-afk gönderilemedi.")
 
     def vpn_monitor(self):
         self.forticlient_window_shown = False
