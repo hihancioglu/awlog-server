@@ -461,7 +461,9 @@ class NetworkWidget(QWidget):
         painter.setPen(Qt.black)
         painter.setBrush(Qt.lightGray)
         painter.drawRect(comp_rect)
-        painter.drawRect(comp_center.x() - 10, comp_center.y() + 15, 20, 5)
+        # QRectF kullanarak float koordinatlarla çizmeye izin ver
+        stand_rect = QRectF(comp_center.x() - 10, comp_center.y() + 15, 20, 5)
+        painter.drawRect(stand_rect)
 
         # draw world icon
         painter.setBrush(Qt.lightGray)
