@@ -10,7 +10,8 @@ def create_app() -> Flask:
     """Application factory for the AWLog server."""
     load_dotenv()
 
-    app = Flask(__name__)
+    templates_path = os.path.join(os.path.dirname(__file__), "..", "templates")
+    app = Flask(__name__, template_folder=templates_path)
     app.secret_key = os.environ.get("FLASK_SECRET_KEY", "change-me")
 
     db_path = os.path.join(os.path.dirname(__file__), "..", "data", "awlogs.sqlite")
