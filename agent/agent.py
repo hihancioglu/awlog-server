@@ -229,8 +229,7 @@ def input_event():
         log_status_period(afk_period_start, afk_period_end, "afk")
         notafk_period_start = afk_period_end
         afk_state = False
-        if not report_status("not-afk"):
-            DEBUG("report_status not-afk failed")
+        report_status_async("not-afk")
 
 def on_key_press(key):
     """Keyboard press handler that ignores repeated keydown events."""
@@ -343,6 +342,10 @@ def report_status(status):
     except Exception as e:
         DEBUG(f"report_status exception: {e}")
         return False
+
+def report_status_async(status):
+    """Send status update in a background thread."""
+    threading.Thread(target=report_status, args=(status,), daemon=True).start()
 
 def report_window(window_title, process_name):
     """Send current window information to the server."""
