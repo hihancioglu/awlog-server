@@ -29,7 +29,7 @@
             <th>Bugün Toplam</th>
         </tr>
     </thead>
-    <tbody>
+    <tbody id="status-table-body">
         {% for row in status_list %}
         <tr>
             <td>{{ row.username }}</td>
@@ -52,5 +52,37 @@
   <a class="btn btn-primary" href="/usage_report" style="margin-left:10px">Kullanım Raporları</a>
   <a class="btn btn-info" href="/daily_timeline" style="margin-left:10px">Zaman Çizelgesi</a>
 </div>
+<script>
+function formatDuration(sec){
+    sec = Math.floor(sec || 0);
+    const h = Math.floor(sec / 3600);
+    const m = Math.floor((sec % 3600) / 60);
+    return h + ':' + String(m).padStart(2, '0');
+}
+
+function updateStatus(){
+    fetch('/api/current_status')
+        .then(r => r.json())
+        .then(rows => {
+            const tbody = document.getElementById('status-table-body');
+            tbody.innerHTML = '';
+            rows.forEach(row => {
+                const tr = document.createElement('tr');
+                tr.innerHTML =
+                    `<td>${row.username}</td>`+
+                    `<td>${row.hostname}</td>`+
+                    `<td>${row.badge}</td>`+
+                    `<td>${row.window_title}</td>`+
+                    `<td>${row.shown_status}</td>`+
+                    `<td>${row.ip}</td>`+
+                    `<td>${formatDuration(row.today_active)}</td>`+
+                    `<td>${formatDuration(row.today_total)}</td>`;
+                tbody.appendChild(tr);
+            });
+        });
+}
+
+setInterval(updateStatus, 60000);
+</script>
 </body>
 </html>

@@ -966,6 +966,17 @@ def api_today_totals():
     return jsonify(details)
 
 
+@app.route("/api/current_status")
+@login_required
+def api_current_status():
+    """Return current online/afk status list used on the main panel."""
+    status_list = get_current_status()
+    if not is_admin():
+        user = session.get("user")
+        status_list = [s for s in status_list if s["username"] == user]
+    return jsonify(status_list)
+
+
 def get_weekly_report(username: str, week_start: date):
     """Return daily online/active/afk totals for given user and week."""
     results = []
