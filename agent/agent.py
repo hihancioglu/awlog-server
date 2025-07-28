@@ -13,6 +13,7 @@ import queue
 import json
 import hmac
 import hashlib
+import asyncio
 from datetime import datetime, timedelta
 from pynput import mouse, keyboard
 
@@ -153,12 +154,8 @@ def load_secret():
             AGENT_SECRET = None
     return AGENT_SECRET
 
-def send_log_to_server(log_type, data):
-    """Send a log entry to the server.
-
-    Returns a tuple ``(ok, status_code, message)`` where ``ok`` is ``True``
-    when the server responded with HTTP 200. ``status_code`` and ``message``
-    contain the server response information for troubleshooting."""
+async def _send_log_to_server(log_type, data):
+    """Asynchronously send a log entry to the server."""
     try:
         load_secret()
         data["log_type"] = log_type
@@ -171,7 +168,13 @@ def send_log_to_server(log_type, data):
             f"{data.get('window_title') or data.get('status')}"
         )
         headers = {"Content-Type": "application/json", "X-Signature": sig}
-        response = requests.post(f"{SERVER_URL}/api/log", data=payload.encode(), headers=headers, timeout=2)
+        response = await asyncio.to_thread(
+            requests.post,
+            f"{SERVER_URL}/api/log",
+            data=payload.encode(),
+            headers=headers,
+            timeout=2,
+        )
         if response.status_code != 200:
             DEBUG(
                 f"send_log_to_server failed status={response.status_code} "
@@ -181,6 +184,10 @@ def send_log_to_server(log_type, data):
     except Exception as e:
         DEBUG(f"send_log_to_server exception: {e}")
         return False, None, str(e)
+
+def send_log_to_server(log_type, data):
+    """Wrapper to run asynchronous log sending synchronously."""
+    return asyncio.run(_send_log_to_server(log_type, data))
 
 def log_window_period(window_title, process_name, start_time, end_time):
     duration = int((end_time - start_time).total_seconds())
@@ -314,10 +321,8 @@ def get_ip():
     except Exception:
         return "unknown"
 
-def report_status(status):
-    """Send status information to the server.
-
-    Returns ``True`` when the server acknowledges the status update."""
+async def _report_status(status):
+    """Asynchronously send status information to the server."""
     data = {
         "username": getpass.getuser(),
         "hostname": socket.gethostname(),
@@ -328,7 +333,8 @@ def report_status(status):
         load_secret()
         payload = json.dumps(data, ensure_ascii=False, separators=(",", ":"))
         sig = hmac.new(AGENT_SECRET.encode(), payload.encode(), hashlib.sha256).hexdigest()
-        r = requests.post(
+        r = await asyncio.to_thread(
+            requests.post,
             f"{SERVER_URL}/report",
             data=payload.encode(),
             headers={"Content-Type": "application/json", "X-Signature": sig},
@@ -343,12 +349,18 @@ def report_status(status):
         DEBUG(f"report_status exception: {e}")
         return False
 
-def report_status_async(status):
-    """Send status update in a background thread."""
-    threading.Thread(target=report_status, args=(status,), daemon=True).start()
+def report_status(status):
+    """Wrapper to run asynchronous status reporting synchronously."""
+    return asyncio.run(_report_status(status))
 
-def report_window(window_title, process_name):
-    """Send current window information to the server."""
+def report_status_async(status):
+    """Send status update in a background thread using async HTTP."""
+    threading.Thread(
+        target=lambda: asyncio.run(_report_status(status)), daemon=True
+    ).start()
+
+async def _report_window(window_title, process_name):
+    """Asynchronously send current window information to the server."""
     data = {
         "username": getpass.getuser(),
         "hostname": socket.gethostname(),
@@ -361,7 +373,8 @@ def report_window(window_title, process_name):
         load_secret()
         payload = json.dumps(data, ensure_ascii=False, separators=(",", ":"))
         sig = hmac.new(AGENT_SECRET.encode(), payload.encode(), hashlib.sha256).hexdigest()
-        r = requests.post(
+        r = await asyncio.to_thread(
+            requests.post,
             f"{SERVER_URL}/report",
             data=payload.encode(),
             headers={"Content-Type": "application/json", "X-Signature": sig},
@@ -375,6 +388,10 @@ def report_window(window_title, process_name):
     except Exception as e:
         DEBUG(f"report_window exception: {e}")
         return False
+
+def report_window(window_title, process_name):
+    """Wrapper to run asynchronous window reporting synchronously."""
+    return asyncio.run(_report_window(window_title, process_name))
 
 def server_accessible(attempts=2, delay=2):
     """Check if server is reachable with multiple attempts."""
