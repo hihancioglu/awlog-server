@@ -466,13 +466,34 @@ def get_current_status():
         window_sub,
         (ReportLog.username == window_sub.c.username)
         & (ReportLog.hostname == window_sub.c.hostname)
-        & (ReportLog.created_at == window_sub.c.max_created_at)
+        & (ReportLog.created_at == window_sub.c.max_created_at),
     )
 
     window_map = {
         (w.username, w.hostname): w.window_title or ""
         for w in window_q
     }
+
+    # Fallback: use last WindowLog entry if no window report exists
+    wl_sub = (
+        db.session.query(
+            WindowLog.username,
+            WindowLog.hostname,
+            func.max(WindowLog.created_at).label("max_created_at"),
+        )
+        .group_by(WindowLog.username, WindowLog.hostname)
+    ).subquery()
+
+    wl_q = db.session.query(WindowLog).join(
+        wl_sub,
+        (WindowLog.username == wl_sub.c.username)
+        & (WindowLog.hostname == wl_sub.c.hostname)
+        & (WindowLog.created_at == wl_sub.c.max_created_at),
+    )
+
+    for w in wl_q:
+        pair = (w.username, w.hostname)
+        window_map.setdefault(pair, w.window_title or "")
 
     report_map = {
         (r.username, r.hostname): {
@@ -503,9 +524,9 @@ def get_current_status():
                 shown_status = "Aktif"
         else:
             if log.status == "afk":
-                shown_status = "Aktif"
-            else:
                 shown_status = "AFK"
+            else:
+                shown_status = "Aktif"
 
         active_today = (
             db.session.query(func.sum(StatusLog.duration))
