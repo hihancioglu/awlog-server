@@ -23,7 +23,6 @@
             <th>PC</th>
             <th>Durum</th>
             <th>Aktif Pencere</th>
-            <th>AFK Durumu</th>
             <th>IP</th>
             <th>Bugün Aktif</th>
             <th>Bugün Toplam</th>
@@ -36,7 +35,6 @@
             <td>{{ row.hostname }}</td>
             <td>{{ row.badge|safe }}</td>
             <td>{{ row.window_title }}</td>
-            <td>{{ row.shown_status }}</td>
             <td>{{ row.ip }}</td>
             <td>{{ format_duration(row.today_active) }}</td>
             <td>{{ format_duration(row.today_total) }}</td>
@@ -73,7 +71,6 @@ function updateStatus(){
                     `<td>${row.hostname}</td>`+
                     `<td>${row.badge}</td>`+
                     `<td>${row.window_title}</td>`+
-                    `<td>${row.shown_status}</td>`+
                     `<td>${row.ip}</td>`+
                     `<td>${formatDuration(row.today_active)}</td>`+
                     `<td>${formatDuration(row.today_total)}</td>`;
