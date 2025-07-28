@@ -537,8 +537,10 @@ def get_current_status():
         for r in report_q
     }
 
+    # Bugün toplam süreleri kullanıcı bazında hesapla
+    today_details = {d["username"]: d for d in get_today_user_details()}
+
     status_list = []
-    today_str = local_now().date().isoformat()
     for log in status_q:
         pair = (log.username, log.hostname)
         rep = report_map.get(pair)
@@ -561,64 +563,9 @@ def get_current_status():
             else:
                 shown_status = "Aktif"
 
-        active_today = (
-            db.session.query(func.sum(StatusLog.duration))
-            .filter(
-                StatusLog.username == log.username,
-                StatusLog.hostname == log.hostname,
-                StatusLog.status == "not-afk",
-                func.substr(StatusLog.start_time, 1, 10) == today_str,
-            )
-            .scalar()
-            or 0
-        )
-
-        afk_today = (
-            db.session.query(func.sum(StatusLog.duration))
-            .filter(
-                StatusLog.username == log.username,
-                StatusLog.hostname == log.hostname,
-                StatusLog.status == "afk",
-                func.substr(StatusLog.start_time, 1, 10) == today_str,
-            )
-            .scalar()
-            or 0
-        )
-
-        # Devam eden aktif donemi de ekle
-        if (
-            rep
-            and state
-            and rep["status"] != "offline"
-            and state.status == "not-afk"
-        ):
-            try:
-                last_end = datetime.fromisoformat(log.end_time)
-            except Exception:
-                last_end = None
-            start = state.created_at
-            if last_end and last_end > start:
-                start = last_end
-            if start < datetime.utcnow():
-                active_today += int((datetime.utcnow() - start).total_seconds())
-
-        if (
-            rep
-            and state
-            and rep["status"] != "offline"
-            and state.status == "afk"
-        ):
-            try:
-                last_end = datetime.fromisoformat(log.end_time)
-            except Exception:
-                last_end = None
-            start = state.created_at
-            if last_end and last_end > start:
-                start = last_end
-            if start < datetime.utcnow():
-                afk_today += int((datetime.utcnow() - start).total_seconds())
-
-        total_today = active_today + afk_today
+        detail = today_details.get(log.username, {})
+        active_today = int(detail.get("active", 0))
+        total_today = int(detail.get("total", 0))
 
         status_list.append({
             "username": log.username,
@@ -634,7 +581,6 @@ def get_current_status():
 
     # Kullanıcının daha önce hiç StatusLog kaydı yoksa raporlardan ekle
     status_pairs = {(s["username"], s["hostname"]) for s in status_list}
-    now = datetime.utcnow()
     for pair, rep in report_map.items():
         if pair in status_pairs or rep["status"] == "offline":
             continue
@@ -647,14 +593,7 @@ def get_current_status():
         else:
             shown_status = "Aktif"
 
-        active_today = afk_today = 0
-        if state and state.created_at < now:
-            delta = int((now - state.created_at).total_seconds())
-            if state.status == "not-afk":
-                active_today = delta
-            else:
-                afk_today = delta
-
+        detail = today_details.get(pair[0], {})
         status_list.append({
             "username": pair[0],
             "hostname": pair[1],
@@ -663,8 +602,8 @@ def get_current_status():
             "badge": badge,
             "window_title": window_map.get(pair, ""),
             "ip": rep.get("ip") if rep else "?",
-            "today_active": active_today,
-            "today_total": active_today + afk_today,
+            "today_active": int(detail.get("active", 0)),
+            "today_total": int(detail.get("total", 0)),
         })
     return status_list
 
