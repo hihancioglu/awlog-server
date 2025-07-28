@@ -11,6 +11,8 @@ import tempfile
 import time
 import queue
 import json
+import hmac
+import hashlib
 from datetime import datetime, timedelta
 from pynput import mouse, keyboard
 
@@ -73,7 +75,8 @@ def is_forticlient_running():
 SERVER_URL = "http://baylan-portainer:5050"
 FORTICLIENT_CONSOLE_PATH = r"C:\Program Files\Fortinet\FortiClient\FortiClientConsole.exe"
 CHECK_INTERVAL = 30
-SECRET = "UzunVEZorluBirKey2024@!"  # Güvenlik için
+SECRET_FILE = os.path.join(tempfile.gettempdir(), "agent_secret.txt")
+AGENT_SECRET = None
 
 # ----- LOG (AFK/AKTİF & PENCERE TAKİBİ) -----
 afk_timeout = 60  # saniye (AFK için 1dk uygundur)
@@ -125,6 +128,31 @@ def get_hostname():
 def get_username():
     return getpass.getuser()
 
+
+def load_secret():
+    """Retrieve or request the per-agent secret."""
+    global AGENT_SECRET
+    if AGENT_SECRET:
+        return AGENT_SECRET
+    if os.path.exists(SECRET_FILE):
+        try:
+            with open(SECRET_FILE, "r", encoding="utf-8") as f:
+                AGENT_SECRET = f.read().strip()
+        except Exception:
+            AGENT_SECRET = None
+    if not AGENT_SECRET:
+        data = {"hostname": get_hostname(), "username": get_username()}
+        try:
+            r = requests.post(f"{SERVER_URL}/register", json=data, timeout=5)
+            if r.status_code == 200:
+                AGENT_SECRET = r.json().get("secret")
+                with open(SECRET_FILE, "w", encoding="utf-8") as f:
+                    f.write(AGENT_SECRET)
+        except Exception as e:
+            DEBUG(f"load_secret error: {e}")
+            AGENT_SECRET = None
+    return AGENT_SECRET
+
 def send_log_to_server(log_type, data):
     """Send a log entry to the server.
 
@@ -132,15 +160,18 @@ def send_log_to_server(log_type, data):
     when the server responded with HTTP 200. ``status_code`` and ``message``
     contain the server response information for troubleshooting."""
     try:
+        load_secret()
         data["log_type"] = log_type
         data["hostname"] = get_hostname()
         data["username"] = get_username()
-        data["secret"] = SECRET
+        payload = json.dumps(data, ensure_ascii=False, separators=(",", ":"))
+        sig = hmac.new(AGENT_SECRET.encode(), payload.encode(), hashlib.sha256).hexdigest()
         DEBUG(
             f"send_log_to_server {log_type} "
             f"{data.get('window_title') or data.get('status')}"
         )
-        response = requests.post(f"{SERVER_URL}/api/log", json=data, timeout=2)
+        headers = {"Content-Type": "application/json", "X-Signature": sig}
+        response = requests.post(f"{SERVER_URL}/api/log", data=payload.encode(), headers=headers, timeout=2)
         if response.status_code != 200:
             DEBUG(
                 f"send_log_to_server failed status={response.status_code} "
@@ -293,10 +324,17 @@ def report_status(status):
         "hostname": socket.gethostname(),
         "ip": get_ip(),
         "status": status,
-        "secret": SECRET,
     }
     try:
-        r = requests.post(f"{SERVER_URL}/report", json=data, timeout=5)
+        load_secret()
+        payload = json.dumps(data, ensure_ascii=False, separators=(",", ":"))
+        sig = hmac.new(AGENT_SECRET.encode(), payload.encode(), hashlib.sha256).hexdigest()
+        r = requests.post(
+            f"{SERVER_URL}/report",
+            data=payload.encode(),
+            headers={"Content-Type": "application/json", "X-Signature": sig},
+            timeout=5,
+        )
         if r.status_code != 200:
             DEBUG(
                 f"report_status failed status={r.status_code} resp={r.text.strip()}"
@@ -315,10 +353,17 @@ def report_window(window_title, process_name):
         "status": "window",
         "window_title": window_title or "",
         "process_name": process_name or "",
-        "secret": SECRET,
     }
     try:
-        r = requests.post(f"{SERVER_URL}/report", json=data, timeout=5)
+        load_secret()
+        payload = json.dumps(data, ensure_ascii=False, separators=(",", ":"))
+        sig = hmac.new(AGENT_SECRET.encode(), payload.encode(), hashlib.sha256).hexdigest()
+        r = requests.post(
+            f"{SERVER_URL}/report",
+            data=payload.encode(),
+            headers={"Content-Type": "application/json", "X-Signature": sig},
+            timeout=5,
+        )
         if r.status_code != 200:
             DEBUG(
                 f"report_window failed status={r.status_code} resp={r.text.strip()}"

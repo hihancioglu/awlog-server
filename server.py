@@ -20,9 +20,12 @@ import threading
 import time
 import json
 import logging
+import hmac
+import hashlib
+import secrets
 from debug_utils import DEBUG
 
-from models import db, WindowLog, StatusLog, ReportLog, ApiLog
+from models import db, WindowLog, StatusLog, ReportLog, ApiLog, AgentSecret
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "change-me")
@@ -31,7 +34,6 @@ db_path = os.path.join(os.path.dirname(__file__), "data", "awlogs.sqlite")
 os.makedirs(os.path.dirname(db_path), exist_ok=True)
 app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{db_path}"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-SECRET = os.environ.get("SECRET", "UzunVEZorluBirKey2024@!")
 KEEPALIVE_INTERVAL = int(os.environ.get("KEEPALIVE_INTERVAL", 120))  # seconds
 OFFLINE_MULTIPLIER = int(os.environ.get("OFFLINE_MULTIPLIER", 3))
 MONITOR_INTERVAL = int(os.environ.get("MONITOR_INTERVAL", 60))
@@ -145,9 +147,27 @@ def get_app_from_window(title: str, process: str) -> str:
             return parts[0].lower()
     return proc or "unknown"
 
+
+@app.route("/register", methods=["POST"])
+def register_agent():
+    """Return a per-agent secret, creating one if necessary."""
+    data = request.json
+    hostname = data.get("hostname")
+    username = data.get("username")
+    if not hostname or not username:
+        return jsonify({"error": "bad_request"}), 400
+    agent = AgentSecret.query.filter_by(hostname=hostname, username=username).first()
+    if not agent:
+        secret = secrets.token_hex(32)
+        agent = AgentSecret(hostname=hostname, username=username, secret=secret)
+        db.session.add(agent)
+        db.session.commit()
+    return jsonify({"secret": agent.secret})
+
 @app.route("/api/log", methods=["POST"])
 def receive_log():
-    data = request.json
+    raw_payload = request.get_data()
+    data = json.loads(raw_payload.decode("utf-8"))
     log_type = data.get("log_type")
     hostname = data.get("hostname")
     username = data.get("username")
@@ -165,8 +185,14 @@ def receive_log():
     )
     db.session.commit()
 
-    if data.get("secret") != SECRET:
-        logger.warning("Invalid secret on /api/log from %s@%s", username, hostname)
+    agent = AgentSecret.query.filter_by(hostname=hostname, username=username).first()
+    sig = request.headers.get("X-Signature", "")
+    if not agent:
+        logger.warning("Unknown agent on /api/log from %s@%s", username, hostname)
+        return jsonify({"error": "forbidden"}), 403
+    expected = hmac.new(agent.secret.encode(), raw_payload, hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(expected, sig):
+        logger.warning("Invalid signature on /api/log from %s@%s", username, hostname)
         return jsonify({"error": "forbidden"}), 403
 
 
@@ -203,7 +229,8 @@ def receive_log():
 
 @app.route("/report", methods=["POST"])
 def report_status():
-    data = request.json
+    raw_payload = request.get_data()
+    data = json.loads(raw_payload.decode("utf-8"))
     hostname = data.get("hostname")
     username = data.get("username")
     ip = data.get("ip")
@@ -221,8 +248,14 @@ def report_status():
     )
     db.session.commit()
 
-    if data.get("secret") != SECRET:
-        logger.warning("Invalid secret on /report from %s@%s", username, hostname)
+    agent = AgentSecret.query.filter_by(hostname=hostname, username=username).first()
+    sig = request.headers.get("X-Signature", "")
+    if not agent:
+        logger.warning("Unknown agent on /report from %s@%s", username, hostname)
+        return jsonify({"error": "forbidden"}), 403
+    expected = hmac.new(agent.secret.encode(), raw_payload, hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(expected, sig):
+        logger.warning("Invalid signature on /report from %s@%s", username, hostname)
         return jsonify({"error": "forbidden"}), 403
     if not hostname or not username or not status:
         return jsonify({"error": "bad_request"}), 400
