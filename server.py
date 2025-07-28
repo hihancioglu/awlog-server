@@ -568,6 +568,41 @@ def get_current_status():
             "today_active": active_today,
             "today_total": total_today,
         })
+
+    # Kullanıcının daha önce hiç StatusLog kaydı yoksa raporlardan ekle
+    status_pairs = {(s["username"], s["hostname"]) for s in status_list}
+    now = datetime.utcnow()
+    for pair, rep in report_map.items():
+        if pair in status_pairs or rep["status"] == "offline":
+            continue
+        state = state_map.get(pair)
+        badge = '<span class="badge bg-success">Online</span>'
+        if rep["status"] in ("afk", "not-afk"):
+            shown_status = "AFK" if rep["status"] == "afk" else "Aktif"
+        elif state:
+            shown_status = "AFK" if state.status == "afk" else "Aktif"
+        else:
+            shown_status = "Aktif"
+
+        active_today = afk_today = 0
+        if state and state.created_at < now:
+            delta = int((now - state.created_at).total_seconds())
+            if state.status == "not-afk":
+                active_today = delta
+            else:
+                afk_today = delta
+
+        status_list.append({
+            "username": pair[0],
+            "hostname": pair[1],
+            "status": rep["status"],
+            "shown_status": shown_status,
+            "badge": badge,
+            "window_title": window_map.get(pair, ""),
+            "ip": rep.get("ip") if rep else "?",
+            "today_active": active_today,
+            "today_total": active_today + afk_today,
+        })
     return status_list
 
 
