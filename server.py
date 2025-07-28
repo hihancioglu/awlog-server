@@ -1076,8 +1076,8 @@ def generate_all_weekly_tables():
     for username, rows in all_reports.items():
         table_rows = "".join(
             f"<tr><td>{r['date']}</td>"
-            f"<td>{local_time(r['start']) if r['start'] else ''}</td>"
-            f"<td>{local_time(r['end']) if r['end'] else ''}</td>"
+            f"<td>{local_time(r['start'], '%H:%M') if r['start'] else ''}</td>"
+            f"<td>{local_time(r['end'], '%H:%M') if r['end'] else ''}</td>"
             f"<td>{format_duration(r['online'])}</td>"
             f"<td>{format_duration(r['active'])}</td>"
             f"<td>{format_duration(r['afk'])}</td></tr>"
