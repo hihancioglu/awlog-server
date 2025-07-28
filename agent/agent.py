@@ -125,16 +125,30 @@ def get_username():
     return getpass.getuser()
 
 def send_log_to_server(log_type, data):
+    """Send a log entry to the server.
+
+    Returns a tuple ``(ok, status_code, message)`` where ``ok`` is ``True``
+    when the server responded with HTTP 200. ``status_code`` and ``message``
+    contain the server response information for troubleshooting."""
     try:
-        data['log_type'] = log_type
-        data['hostname'] = get_hostname()
-        data['username'] = get_username()
-        data['secret'] = SECRET
-        DEBUG(f"send_log_to_server {log_type} {data.get('window_title') or data.get('status')}")
+        data["log_type"] = log_type
+        data["hostname"] = get_hostname()
+        data["username"] = get_username()
+        data["secret"] = SECRET
+        DEBUG(
+            f"send_log_to_server {log_type} "
+            f"{data.get('window_title') or data.get('status')}"
+        )
         response = requests.post(f"{SERVER_URL}/api/log", json=data, timeout=2)
-        return response.status_code == 200
+        if response.status_code != 200:
+            DEBUG(
+                f"send_log_to_server failed status={response.status_code} "
+                f"resp={response.text.strip()}"
+            )
+        return response.status_code == 200, response.status_code, response.text
     except Exception as e:
-        return False
+        DEBUG(f"send_log_to_server exception: {e}")
+        return False, None, str(e)
 
 def log_window_period(window_title, process_name, start_time, end_time):
     duration = int((end_time - start_time).total_seconds())
@@ -183,7 +197,8 @@ def input_event():
         log_status_period(afk_period_start, afk_period_end, "afk")
         notafk_period_start = afk_period_end
         afk_state = False
-        report_status("not-afk")
+        if not report_status("not-afk"):
+            DEBUG("report_status not-afk failed")
 
 def on_key_press(key):
     """Keyboard press handler that ignores repeated keydown events."""
@@ -235,7 +250,8 @@ def logging_thread_func(running_flag, log_callback=None):
             afk_period_start = now
             if log_callback:
                 log_callback("AFK oldu")
-            report_status("afk")
+            if not report_status("afk"):
+                DEBUG("report_status afk failed")
 
         # Pencere değişimi kontrolü
         current_window, current_process = get_active_window_info()
@@ -266,16 +282,26 @@ def get_ip():
         return "unknown"
 
 def report_status(status):
+    """Send status information to the server.
+
+    Returns ``True`` when the server acknowledges the status update."""
     data = {
         "username": getpass.getuser(),
         "hostname": socket.gethostname(),
         "ip": get_ip(),
         "status": status,
-        "secret": SECRET
+        "secret": SECRET,
     }
     try:
         r = requests.post(f"{SERVER_URL}/report", json=data, timeout=5)
-    except Exception: pass
+        if r.status_code != 200:
+            DEBUG(
+                f"report_status failed status={r.status_code} resp={r.text.strip()}"
+            )
+        return r.status_code == 200
+    except Exception as e:
+        DEBUG(f"report_status exception: {e}")
+        return False
 
 def server_accessible(attempts=2, delay=2):
     """Check if server is reachable with multiple attempts."""
@@ -423,8 +449,10 @@ class MainWindow(QWidget):
         self.fetch_today_totals()
         if not self.active:
             return
-        report_status("online")
-        report_status("not-afk")
+        if not report_status("online"):
+            self.logla("Online durumu sunucuya iletilemedi.")
+        if not report_status("not-afk"):
+            self.logla("not-afk durumu sunucuya iletilemedi.")
         self.status_label.setText("Durum: Aktif (Evden Çalışma Başladı)")
         self.logla("Online bildirildi, takip başladı.")
 
@@ -447,7 +475,11 @@ class MainWindow(QWidget):
         while self.active or not log_queue.empty():
             try:
                 log_type, data = log_queue.get(timeout=0.5)
-                if not send_log_to_server(log_type, data):
+                ok, status_code, message = send_log_to_server(log_type, data)
+                if not ok:
+                    self.logla(
+                        f"Sunucu log kaydetmedi (HTTP {status_code}): {message.strip()}"
+                    )
                     # Local dosyada tut, örnek amaçlı
                     with open(LOG_PATH, "a", encoding="utf-8") as f:
                         f.write(json.dumps(data, ensure_ascii=False) + "\n")
@@ -466,8 +498,10 @@ class MainWindow(QWidget):
                 time.sleep(1)
             if not self.active:
                 return
-            report_status("keepalive")
-            self.logla("Keepalive gönderildi.")
+            if report_status("keepalive"):
+                self.logla("Keepalive gönderildi.")
+            else:
+                self.logla("Keepalive gönderilemedi.")
 
     def vpn_monitor(self):
         self.forticlient_window_shown = False
@@ -494,8 +528,10 @@ class MainWindow(QWidget):
                 if self.forticlient_window_shown or not was_online:
                     self.logla("VPN bağlantısı tekrar sağlandı.")
                 if not was_online:
-                    report_status("online")
-                    report_status("afk" if afk_state else "not-afk")
+                    if not report_status("online"):
+                        self.logla("Online durumu sunucuya iletilemedi.")
+                    if not report_status("afk" if afk_state else "not-afk"):
+                        self.logla("Durum bilgisi sunucuya iletilemedi.")
                 self.status_label.setText("Durum: VPN Bağlı")
                 self.forticlient_window_shown = False
             was_online = online
@@ -510,7 +546,8 @@ class MainWindow(QWidget):
             log_status_period(notafk_period_start, now, "not-afk")
 
         self.active = False
-        report_status("offline")
+        if not report_status("offline"):
+            self.logla("Offline durumu sunucuya iletilemedi.")
         kill_all_forticlient_processes()
         self.logla("Offline bildirildi, uygulama kapatıldı.")
 
