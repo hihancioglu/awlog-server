@@ -30,7 +30,8 @@ Başlatıldığında sunucu, `LOG_DIR` altında `server.log` dosyasına hata
 ve uyarı mesajlarını yazar.
 
 ## Ortam Değişkenleri
-- `SECRET` – İstemcilerin gönderdiği istekleri doğrulamak için kullanılan anahtar.
+- Artık global `SECRET` anahtarı kullanılmaz. Her istemci `/register` uç noktasından
+  kendisine özel bir anahtar alır ve HMAC imzalı isteklerde bu anahtarı kullanır.
 - `KEEPALIVE_INTERVAL` – Keepalive bildirimlerinin beklenen aralığı (saniye).
 - `OFFLINE_MULTIPLIER` – Kullanıcıyı çevrimdışı kabul etmeden önce beklenen keepalive süresinin kaç katı süre geçmesi gerektiği.
 - `MONITOR_INTERVAL` – Arka plan izleme iş parçacığının kontrol aralığı (saniye).
@@ -41,6 +42,7 @@ ve uyarı mesajlarını yazar.
 - `DEBUG` – `1` veya `true` ise ek hata ayıklama mesajları loglanır.
 
 ## API Uç Noktaları
+- `POST /register` – İstemciye benzersiz bir gizli anahtar döner.
 - `POST /api/log` – `log_type` alanı "window" veya "status" olduğunda ilgili verileri kaydeder.
 - `POST /report` – Kullanıcının çevrim içi/çevrim dışı/afk durumunu veya güncel pencere bilgisini bildirir.
   - `status` alanı `window` ise `window_title` ve `process_name` gönderilmelidir.

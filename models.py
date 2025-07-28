@@ -47,3 +47,15 @@ class ApiLog(db.Model):
     username = db.Column(db.String(128))
     payload = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class AgentSecret(db.Model):
+    """Per-agent secret used for request authentication."""
+
+    id = db.Column(db.Integer, primary_key=True)
+    hostname = db.Column(db.String(128))
+    username = db.Column(db.String(128))
+    secret = db.Column(db.String(64))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    __table_args__ = (db.UniqueConstraint("hostname", "username", name="u_agent"),)
