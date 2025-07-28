@@ -493,6 +493,13 @@ class MainWindow(QWidget):
                 data = r.json()
                 today_active_seconds = int(data.get("active", 0))
                 today_afk_seconds = int(data.get("afk", 0))
+                # Reset the current not-afk period start so the label does not
+                # add extra seconds before logging thread initializes.
+                global notafk_period_start, afk_period_start, last_input_time
+                now = datetime.now()
+                notafk_period_start = now
+                afk_period_start = now
+                last_input_time = time.time()
                 self.update_time_labels()
         except Exception:
             pass
