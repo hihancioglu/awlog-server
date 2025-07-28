@@ -79,6 +79,7 @@ SECRET = "UzunVEZorluBirKey2024@!"  # Güvenlik için
 afk_timeout = 60  # saniye (AFK için 1dk uygundur)
 log_queue = queue.Queue()
 LOG_PATH = os.path.join(tempfile.gettempdir(), "windowlog.txt")
+STATUSLOG_PATH = os.path.join(tempfile.gettempdir(), "statuslog.txt")
 
 # --- Bugünü Anlık Aktif/AFK Sayaçları ---
 today_active_seconds = 0
@@ -523,7 +524,8 @@ class MainWindow(QWidget):
                         f"Sunucu log kaydetmedi (HTTP {status_code}): {message.strip()}"
                     )
                     # Local dosyada tut, örnek amaçlı
-                    with open(LOG_PATH, "a", encoding="utf-8") as f:
+                    path = LOG_PATH if log_type == "window" else STATUSLOG_PATH
+                    with open(path, "a", encoding="utf-8") as f:
                         f.write(json.dumps(data, ensure_ascii=False) + "\n")
                 # Sunucuya iletimin başarılı olduğunu kullanıcı arayüzünde
                 # göstermek gereksiz, bu yüzden ek loglama yapılmaz
@@ -531,6 +533,43 @@ class MainWindow(QWidget):
                 continue
             except Exception as e:
                 self.logla(f"Log gönderim hatası: {e}")
+
+    def flush_local_logs(self):
+        """Send locally stored logs if any exist."""
+        for path in (LOG_PATH, STATUSLOG_PATH):
+            if not os.path.exists(path):
+                continue
+            remaining = []
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    lines = f.readlines()
+                for line in lines:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        data = json.loads(line)
+                        log_type = data.get("log_type")
+                        ok, _, _ = send_log_to_server(log_type, data)
+                        if not ok:
+                            remaining.append(line)
+                    except Exception:
+                        remaining.append(line)
+            except Exception as e:
+                self.logla(f"Yerel log okuma hatası: {e}")
+                continue
+
+            if remaining:
+                try:
+                    with open(path, "w", encoding="utf-8") as f:
+                        f.write("\n".join(remaining) + "\n")
+                except Exception as e:
+                    self.logla(f"Yerel log yazma hatası: {e}")
+            else:
+                try:
+                    os.remove(path)
+                except Exception:
+                    pass
 
     def keepalive(self):
         while self.active:
@@ -549,6 +588,8 @@ class MainWindow(QWidget):
         self.forticlient_window_shown = False
         was_vpn = vpn_connected()
         was_server = server_accessible() if was_vpn else False
+        if was_server:
+            self.flush_local_logs()
         while self.active:
             for _ in range(CHECK_INTERVAL):
                 if not self.active:
@@ -575,6 +616,7 @@ class MainWindow(QWidget):
                 if self.forticlient_window_shown or not was_vpn:
                     self.logla("VPN bağlantısı tekrar sağlandı.")
                 if not was_server:
+                    self.flush_local_logs()
                     if not report_status("online"):
                         self.logla("Online durumu sunucuya iletilemedi.")
                     if not report_status("afk" if afk_state else "not-afk"):
