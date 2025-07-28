@@ -33,6 +33,8 @@ class ReportLog(db.Model):
     username = db.Column(db.String(128))
     ip = db.Column(db.String(64))
     status = db.Column(db.String(32))  # online/offline/keepalive/afk/not-afk
+    window_title = db.Column(db.String(512))
+    process_name = db.Column(db.String(128))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
