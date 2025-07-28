@@ -966,6 +966,27 @@ def api_today_totals():
     return jsonify(details)
 
 
+@app.route("/agent/today_totals", methods=["POST"])
+def agent_today_totals():
+    """Return today's totals for active and AFK times for an agent."""
+    raw_payload = request.get_data()
+    data = json.loads(raw_payload.decode("utf-8"))
+    hostname = data.get("hostname")
+    username = data.get("username")
+    agent = AgentSecret.query.filter_by(hostname=hostname, username=username).first()
+    sig = request.headers.get("X-Signature", "")
+    if not agent:
+        return jsonify({"error": "forbidden"}), 403
+    expected = hmac.new(agent.secret.encode(), raw_payload, hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(expected, sig):
+        return jsonify({"error": "forbidden"}), 403
+    details = get_today_user_details()
+    for item in details:
+        if item["username"] == username:
+            return jsonify(item)
+    return jsonify({"username": username, "total": 0, "active": 0, "afk": 0})
+
+
 @app.route("/api/current_status")
 @login_required
 def api_current_status():

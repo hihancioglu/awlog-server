@@ -467,9 +467,14 @@ class MainWindow(QWidget):
         """Sunucudan bugünkü toplamları al."""
         global today_active_seconds, today_afk_seconds
         try:
-            r = requests.get(
-                f"{SERVER_URL}/api/today_totals",
-                params={"username": get_username()},
+            load_secret()
+            data = {"username": get_username(), "hostname": get_hostname()}
+            payload = json.dumps(data, ensure_ascii=False, separators=(",", ":"))
+            sig = hmac.new(AGENT_SECRET.encode(), payload.encode(), hashlib.sha256).hexdigest()
+            r = requests.post(
+                f"{SERVER_URL}/agent/today_totals",
+                data=payload.encode(),
+                headers={"Content-Type": "application/json", "X-Signature": sig},
                 timeout=5,
             )
             if r.status_code == 200:
