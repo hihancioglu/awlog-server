@@ -19,9 +19,16 @@ from pynput import mouse, keyboard
 
 from debug_utils import DEBUG
 
-from PyQt5.QtWidgets import QApplication, QWidget, QPushButton, QVBoxLayout, QTextEdit, QLabel
-from PyQt5.QtGui import QIcon, QTextCursor
-from PyQt5.QtCore import pyqtSignal, pyqtSlot, QTimer
+from PyQt5.QtWidgets import (
+    QApplication,
+    QWidget,
+    QPushButton,
+    QVBoxLayout,
+    QTextEdit,
+    QLabel,
+)
+from PyQt5.QtGui import QIcon, QTextCursor, QPainter, QPen
+from PyQt5.QtCore import pyqtSignal, pyqtSlot, QTimer, Qt, QPointF, QRectF
 
 # Agent uygulamasının sürüm bilgisi
 AGENT_VERSION = "1.0.0"
@@ -407,6 +414,14 @@ def server_accessible(attempts=2, delay=2):
             time.sleep(delay)
     return False
 
+def internet_connected():
+    """Return ``True`` if the general internet appears reachable."""
+    try:
+        requests.get("http://example.com", timeout=5)
+        return True
+    except Exception:
+        return False
+
 def vpn_connected():
     """Return ``True`` if ``baylan.local`` is reachable."""
     try:
@@ -415,8 +430,61 @@ def vpn_connected():
     except Exception:
         return False
 
+
+class NetworkWidget(QWidget):
+    """Simple widget displaying network state between computer, internet and factory."""
+
+    @pyqtSlot(bool, bool)
+    def set_status(self, internet_ok, vpn_ok):
+        self.internet_ok = internet_ok
+        self.vpn_ok = vpn_ok
+        self.update()
+
+    def __init__(self):
+        super().__init__()
+        self.internet_ok = False
+        self.vpn_ok = False
+        self.setMinimumHeight(80)
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+        w = self.width()
+        h = self.height()
+
+        comp_center = QPointF(w * 0.2, h / 2)
+        world_center = QPointF(w * 0.5, h / 2)
+        factory_center = QPointF(w * 0.8, h / 2)
+
+        # draw computer icon
+        comp_rect = QRectF(comp_center.x() - 20, comp_center.y() - 15, 40, 30)
+        painter.setPen(Qt.black)
+        painter.setBrush(Qt.lightGray)
+        painter.drawRect(comp_rect)
+        painter.drawRect(comp_center.x() - 10, comp_center.y() + 15, 20, 5)
+
+        # draw world icon
+        painter.setBrush(Qt.lightGray)
+        painter.drawEllipse(world_center, 20, 20)
+
+        # draw factory icon
+        factory_body = QRectF(factory_center.x() - 20, factory_center.y() - 15, 40, 30)
+        painter.drawRect(factory_body)
+        chimney = QRectF(factory_center.x() + 10, factory_center.y() - 30, 8, 15)
+        painter.drawRect(chimney)
+
+        # lines
+        pen = QPen(Qt.green if self.internet_ok else Qt.red, 3)
+        painter.setPen(pen)
+        painter.drawLine(comp_center, world_center)
+
+        pen.setColor(Qt.green if self.vpn_ok else Qt.red)
+        painter.setPen(pen)
+        painter.drawLine(world_center, factory_center)
+
 class MainWindow(QWidget):
     append_log = pyqtSignal(str)
+    update_network = pyqtSignal(bool, bool)
 
     def __init__(self):
         super().__init__()
@@ -445,9 +513,12 @@ class MainWindow(QWidget):
         # Versiyon bilgisini log ekranına da yaz
         self.log.append(f"Uygulama Versiyonu: {AGENT_VERSION}")
 
+        self.network_widget = NetworkWidget()
+
         layout = QVBoxLayout()
         layout.addWidget(self.basla_btn)
         layout.addWidget(self.bitir_btn)
+        layout.addWidget(self.network_widget)
         layout.addWidget(self.status_label)
         layout.addWidget(self.version_label)
         layout.addWidget(self.active_time_label)
@@ -464,6 +535,7 @@ class MainWindow(QWidget):
         self.log_sender_thread = None
 
         self.append_log.connect(self._append_log)
+        self.update_network.connect(self.network_widget.set_status)
 
         self.timer = QTimer(self)
         self.timer.setInterval(1000)
@@ -538,11 +610,13 @@ class MainWindow(QWidget):
         self.logla("Tüm işlemler sonlandırılıyor...")
         self.cleanup()
         self.status_label.setText("Durum: Bekleniyor...")
+        self.update_network.emit(False, False)
 
     def _start_workflow(self):
         self.status_label.setText("Durum: Temizlik yapılıyor...")
         kill_all_forticlient_processes()
         time.sleep(2)
+        self.update_network.emit(internet_connected(), vpn_connected())
 
         if not vpn_connected():
             self.status_label.setText("Durum: VPN Bağlantısı Yok")
@@ -559,6 +633,7 @@ class MainWindow(QWidget):
                     if not self.active:
                         return
                     time.sleep(1)
+                self.update_network.emit(internet_connected(), vpn_connected())
         if vpn_connected() and not server_accessible():
             self.status_label.setText("Durum: API Sunucusu Yok")
             self.logla("VPN bağlı ancak API sunucusuna erişilemiyor.")
@@ -568,6 +643,7 @@ class MainWindow(QWidget):
                     if not self.active:
                         return
                     time.sleep(1)
+                self.update_network.emit(internet_connected(), vpn_connected())
             if not server_accessible():
                 return
         if vpn_connected() and server_accessible():
@@ -584,6 +660,7 @@ class MainWindow(QWidget):
             self.logla("not-afk durumu sunucuya iletilemedi.")
         self.status_label.setText("Durum: Aktif (Evden Çalışma Başladı)")
         self.logla("Online bildirildi, takip başladı.")
+        self.update_network.emit(internet_connected(), vpn_connected())
 
         # LOG İZLEME ve SUNUCUYA GÖNDERME THREAD'LERİ
         self.logging_thread = threading.Thread(target=self.logging_worker, daemon=True)
@@ -681,6 +758,7 @@ class MainWindow(QWidget):
         self.forticlient_window_shown = False
         was_vpn = vpn_connected()
         was_server = server_accessible() if was_vpn else False
+        self.update_network.emit(internet_connected(), was_vpn)
         if was_server:
             self.flush_local_logs()
         while self.active:
@@ -692,6 +770,7 @@ class MainWindow(QWidget):
                 return
             vpn_ok = vpn_connected()
             server_ok = server_accessible() if vpn_ok else False
+            self.update_network.emit(internet_connected(), vpn_ok)
             if not vpn_ok:
                 self.status_label.setText("Durum: VPN KOPUK! Bağlantı bekleniyor...")
                 if not self.forticlient_window_shown:
@@ -733,6 +812,7 @@ class MainWindow(QWidget):
             self.logla("Offline durumu sunucuya iletilemedi.")
         kill_all_forticlient_processes()
         self.logla("Offline bildirildi, uygulama kapatıldı.")
+        self.update_network.emit(False, False)
 
     def closeEvent(self, event):
         self.cleanup()
