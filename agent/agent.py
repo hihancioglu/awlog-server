@@ -688,6 +688,10 @@ class MainWindow(QWidget):
             elif not server_ok:
                 self.status_label.setText("Durum: API Sunucusu Yok")
                 self.logla("VPN var ancak API sunucusuna erişilemiyor.")
+                # Pencere kücültülmüş olsa bile ön plana çıkart
+                self.showNormal()
+                self.raise_()
+                self.activateWindow()
             else:
                 if self.forticlient_window_shown or not was_vpn:
                     self.logla("VPN bağlantısı tekrar sağlandı.")
