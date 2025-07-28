@@ -999,11 +999,13 @@ def api_current_status():
 
 
 def get_weekly_report(username: str, week_start: date):
-    """Return daily online/active/afk totals for given user and week."""
+    """Return daily online/active/afk totals and start/end times."""
     results = []
     for i in range(7):
         day = week_start + timedelta(days=i)
         day_str = day.isoformat()
+
+        # Aggregate online/active/afk durations from StatusLog
         q = (
             db.session.query(StatusLog.status, func.sum(StatusLog.duration))
             .filter(
@@ -1016,12 +1018,42 @@ def get_weekly_report(username: str, week_start: date):
         total_online = sum(row[1] or 0 for row in q)
         active = next((row[1] for row in q if row[0] == "not-afk"), 0) or 0
         afk = next((row[1] for row in q if row[0] == "afk"), 0) or 0
+
+        # Determine start and end times using ReportLog records
+        day_start = datetime.combine(day, datetime.min.time())
+        day_end = day_start + timedelta(days=1)
+
+        start_log = (
+            db.session.query(ReportLog)
+            .filter(
+                ReportLog.username == username,
+                ReportLog.status == "online",
+                ReportLog.created_at >= day_start,
+                ReportLog.created_at < day_end,
+            )
+            .order_by(ReportLog.created_at)
+            .first()
+        )
+        end_log = (
+            db.session.query(ReportLog)
+            .filter(
+                ReportLog.username == username,
+                ReportLog.status.in_(["offline", "keepalive"]),
+                ReportLog.created_at >= day_start,
+                ReportLog.created_at < day_end,
+            )
+            .order_by(ReportLog.created_at.desc())
+            .first()
+        )
+
         results.append(
             {
                 "date": day_str,
                 "online": int(total_online),
                 "active": int(active),
                 "afk": int(afk),
+                "start": start_log.created_at if start_log else None,
+                "end": end_log.created_at if end_log else None,
             }
         )
     return results
@@ -1043,11 +1075,16 @@ def generate_all_weekly_tables():
     tables = []
     for username, rows in all_reports.items():
         table_rows = "".join(
-            f"<tr><td>{r['date']}</td><td>{format_duration(r['online'])}</td><td>{format_duration(r['active'])}</td><td>{format_duration(r['afk'])}</td></tr>"
+            f"<tr><td>{r['date']}</td>"
+            f"<td>{local_time(r['start']) if r['start'] else ''}</td>"
+            f"<td>{local_time(r['end']) if r['end'] else ''}</td>"
+            f"<td>{format_duration(r['online'])}</td>"
+            f"<td>{format_duration(r['active'])}</td>"
+            f"<td>{format_duration(r['afk'])}</td></tr>"
             for r in rows
         )
         tables.append(
-            f"<h4>{username}</h4><table class=\"table table-bordered table-striped shadow\"><thead class=\"table-dark\"><tr><th>Tarih</th><th>Toplam Online</th><th>Aktif Zaman</th><th>AFK Zaman</th></tr></thead><tbody>{table_rows}</tbody></table>"
+            f"<h4>{username}</h4><table class=\"table table-bordered table-striped shadow\"><thead class=\"table-dark\"><tr><th>Tarih</th><th>Başlama</th><th>Bitiş</th><th>Toplam Online</th><th>Aktif Zaman</th><th>AFK Zaman</th></tr></thead><tbody>{table_rows}</tbody></table>"
         )
     return "".join(tables)
 
