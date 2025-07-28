@@ -471,6 +471,15 @@ class MainWindow(QWidget):
         self.timer.start()
         self.update_time_labels()
 
+    def set_connection_status(self, vpn_ok: bool, server_ok: bool):
+        """Update status label depending on VPN and server reachability."""
+        if not vpn_ok:
+            self.status_label.setText("Durum: VPN KOPUK! Bağlantı bekleniyor...")
+        elif not server_ok:
+            self.status_label.setText("Durum: VPN Bağlı, API Sunucusu Yok")
+        else:
+            self.status_label.setText("Durum: VPN Bağlı, API Sunucusu Bağlı")
+
     def logla(self, text):
         self.append_log.emit(text)
 
@@ -545,7 +554,7 @@ class MainWindow(QWidget):
         time.sleep(2)
 
         if not vpn_connected():
-            self.status_label.setText("Durum: VPN Bağlantısı Yok")
+            self.set_connection_status(False, False)
             self.logla("VPN yok. FortiClient başlatılıyor...")
             if not is_forticlient_running():
                 start_forticlient_admin(FORTICLIENT_CONSOLE_PATH)
@@ -553,14 +562,14 @@ class MainWindow(QWidget):
             else:
                 self.logla("FortiClient zaten açık.")
             while not vpn_connected() and self.active:
-                self.status_label.setText("Durum: VPN Bağlantısı Bekleniyor...")
+                self.set_connection_status(False, False)
                 self.logla("VPN bağlantısı bekleniyor...")
                 for _ in range(3):
                     if not self.active:
                         return
                     time.sleep(1)
         if vpn_connected() and not server_accessible():
-            self.status_label.setText("Durum: API Sunucusu Yok")
+            self.set_connection_status(True, False)
             self.logla("VPN bağlı ancak API sunucusuna erişilemiyor.")
             while vpn_connected() and not server_accessible() and self.active:
                 self.logla("API sunucusu bekleniyor...")
@@ -571,7 +580,7 @@ class MainWindow(QWidget):
             if not server_accessible():
                 return
         if vpn_connected() and server_accessible():
-            self.status_label.setText("Durum: VPN Bağlı")
+            self.set_connection_status(True, True)
             self.logla("VPN zaten bağlı, FortiClient başlatılmayacak.")
         if not self.active:
             return
@@ -693,7 +702,7 @@ class MainWindow(QWidget):
             vpn_ok = vpn_connected()
             server_ok = server_accessible() if vpn_ok else False
             if not vpn_ok:
-                self.status_label.setText("Durum: VPN KOPUK! Bağlantı bekleniyor...")
+                self.set_connection_status(False, False)
                 if not self.forticlient_window_shown:
                     if not is_forticlient_running():
                         start_forticlient_admin(FORTICLIENT_CONSOLE_PATH)
@@ -703,7 +712,7 @@ class MainWindow(QWidget):
                     self.forticlient_window_shown = True
                 self.logla("VPN KOPUK. Bağlantı bekleniyor...")
             elif not server_ok:
-                self.status_label.setText("Durum: API Sunucusu Yok")
+                self.set_connection_status(True, False)
                 self.logla("VPN var ancak API sunucusuna erişilemiyor.")
             else:
                 if self.forticlient_window_shown or not was_vpn:
@@ -714,7 +723,7 @@ class MainWindow(QWidget):
                         self.logla("Online durumu sunucuya iletilemedi.")
                     if not report_status("afk" if afk_state else "not-afk"):
                         self.logla("Durum bilgisi sunucuya iletilemedi.")
-                self.status_label.setText("Durum: VPN Bağlı")
+                self.set_connection_status(True, True)
                 self.forticlient_window_shown = False
             was_vpn = vpn_ok
             was_server = server_ok
