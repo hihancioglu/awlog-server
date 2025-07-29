@@ -137,9 +137,9 @@ pressed_keys = set()
 
 # --- Makro Kullanımını Tespit İçin Girdi Zamanları ---
 input_times = []
-MACRO_CHECK_COUNT = 20  # kontrol için gereken minimum girdi sayısı
+MACRO_CHECK_COUNT = 10  # kontrol için gereken minimum girdi sayısı
 MACRO_STD_THRESHOLD = 0.05  # standart sapmanın ortalamaya oranı
-MACRO_MIN_INTERVAL = 0.2  # saniye
+MACRO_MIN_INTERVAL = 30.0  # saniye
 
 # Makro kullanımını tespit etmek için son giriş zamanlarını analiz eder
 def check_macro_pattern(timestamp: float) -> None:
