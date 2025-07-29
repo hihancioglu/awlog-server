@@ -1023,7 +1023,14 @@ def usage_report():
         start = base_date
         end = base_date
 
+    q = request.args.get("q", "").strip().lower()
     usage_rows = get_window_usage_data(selected_user, start.isoformat(), end.isoformat())
+    if q:
+        usage_rows = [
+            (t, p, d)
+            for t, p, d in usage_rows
+            if q in (t or "").lower() or q in (p or "").lower()
+        ]
 
     return render_template(
         "usage_report.html",
@@ -1033,6 +1040,7 @@ def usage_report():
         base_date=base_date,
         usage_rows=usage_rows,
         format_duration=format_duration,
+        q=q,
     )
 
 
@@ -1042,8 +1050,38 @@ def api_logs():
     """Display raw API logs."""
     if not is_admin():
         return redirect(url_for("index"))
-    logs = ApiLog.query.order_by(ApiLog.created_at.desc()).limit(100).all()
-    return render_template("api_logs.html", logs=logs)
+    q = request.args.get("q", "").strip().lower()
+    username = request.args.get("username")
+    endpoint = request.args.get("endpoint")
+
+    query = ApiLog.query
+    if username:
+        query = query.filter(ApiLog.username == username)
+    if endpoint:
+        query = query.filter(ApiLog.endpoint == endpoint)
+    if q:
+        search = f"%{q}%"
+        query = query.filter(
+            ApiLog.payload.ilike(search)
+            | ApiLog.endpoint.ilike(search)
+            | ApiLog.username.ilike(search)
+            | ApiLog.hostname.ilike(search)
+        )
+
+    logs = query.order_by(ApiLog.created_at.desc()).limit(100).all()
+
+    usernames = [u[0] for u in db.session.query(ApiLog.username).distinct()]
+    endpoints = [e[0] for e in db.session.query(ApiLog.endpoint).distinct()]
+
+    return render_template(
+        "api_logs.html",
+        logs=logs,
+        usernames=usernames,
+        endpoints=endpoints,
+        selected_user=username or "",
+        selected_endpoint=endpoint or "",
+        q=q,
+    )
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5050)
