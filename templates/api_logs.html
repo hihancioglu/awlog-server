@@ -17,40 +17,51 @@
     <a class="btn btn-secondary me-3" href="/">Geri Dön</a>
     <h2 class="mb-0">API Logları</h2>
   </div>
-  <form method="get" class="row mb-3">
-    <div class="col">
-      <select name="username" class="form-select">
-        <option value="">Tüm Kullanıcılar</option>
-        {% for u in usernames %}
-        <option value="{{ u }}" {% if u == selected_user %}selected{% endif %}>{{ u }}</option>
-        {% endfor %}
-      </select>
+  <form method="get" class="mb-3">
+    <div class="row mb-2">
+      <div class="col">
+        <select name="username" class="form-select">
+          <option value="">Tüm Kullanıcılar</option>
+          {% for u in usernames %}
+          <option value="{{ u }}" {% if u == selected_user %}selected{% endif %}>{{ u }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col">
+        <select name="endpoint" class="form-select">
+          <option value="">Tüm Endpointler</option>
+          {% for e in endpoints %}
+          <option value="{{ e }}" {% if e == selected_endpoint %}selected{% endif %}>{{ e }}</option>
+          {% endfor %}
+        </select>
+      </div>
     </div>
-    <div class="col">
-      <select name="endpoint" class="form-select">
-        <option value="">Tüm Endpointler</option>
-        {% for e in endpoints %}
-        <option value="{{ e }}" {% if e == selected_endpoint %}selected{% endif %}>{{ e }}</option>
-        {% endfor %}
-      </select>
+    <div class="row mb-2">
+      <div class="col">
+        <input type="text" name="q" class="form-control" placeholder="Ara" value="{{ q }}">
+      </div>
+      <div class="col">
+        <input type="datetime-local" name="start" class="form-control" value="{{ start }}">
+      </div>
+      <div class="col">
+        <input type="datetime-local" name="end" class="form-control" value="{{ end }}">
+      </div>
     </div>
-    <div class="col">
-      <input type="text" name="q" class="form-control" placeholder="Ara" value="{{ q }}">
-    </div>
-    <div class="col">
-      <input type="datetime-local" name="start" class="form-control" value="{{ start }}">
-    </div>
-    <div class="col">
-      <input type="datetime-local" name="end" class="form-control" value="{{ end }}">
-    </div>
-    <div class="col">
-      <input type="text" name="field" class="form-control" placeholder="Alan" value="{{ field }}">
-    </div>
-    <div class="col">
-      <input type="text" name="value" class="form-control" placeholder="Değer" value="{{ value }}">
-    </div>
-    <div class="col">
-      <button class="btn btn-primary" type="submit">Filtrele</button>
+    <div class="row mb-2">
+      <div class="col">
+        <select name="field" class="form-select">
+          <option value="">Payload Alanı</option>
+          {% for f in payload_fields %}
+          <option value="{{ f }}" {% if f == field %}selected{% endif %}>{{ f }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col">
+        <input type="text" name="value" class="form-control" placeholder="Değer" value="{{ value }}">
+      </div>
+      <div class="col">
+        <button class="btn btn-primary w-100" type="submit">Filtrele</button>
+      </div>
     </div>
   </form>
   <table class="table table-bordered table-striped shadow">

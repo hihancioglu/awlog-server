@@ -1123,6 +1123,16 @@ def api_logs():
     usernames = [u[0] for u in db.session.query(ApiLog.username).distinct()]
     endpoints = [e[0] for e in db.session.query(ApiLog.endpoint).distinct()]
 
+    payload_fields = set()
+    for log in logs:
+        try:
+            data = json.loads(log.payload)
+            if isinstance(data, dict):
+                payload_fields.update(data.keys())
+        except Exception:
+            continue
+    payload_fields = sorted(payload_fields)
+
     return render_template(
         "api_logs.html",
         logs=logs,
@@ -1135,6 +1145,7 @@ def api_logs():
         end=end_param or "",
         field=payload_field or "",
         value=payload_value or "",
+        payload_fields=payload_fields,
     )
 
 if __name__ == "__main__":
