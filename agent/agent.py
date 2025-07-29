@@ -271,15 +271,26 @@ def get_active_window_info():
         return None, None
 
 def logging_thread_func(running_flag, log_callback=None):
-    global afk_state, afk_period_start, notafk_period_start, prev_window, prev_process, window_period_start
+    global afk_state, afk_period_start, notafk_period_start, prev_window, prev_process, window_period_start, last_input_time
     start_listeners()
     prev_window, prev_process = get_active_window_info()
     window_period_start = datetime.now()
     notafk_period_start = window_period_start
     report_window(prev_window, prev_process)
+    last_check = datetime.now()
 
     while running_flag.is_set():
         now = datetime.now()
+
+        if (now - last_check).total_seconds() > afk_timeout * 2:
+            # System likely resumed from sleep; avoid logging a huge not-afk period
+            if not afk_state:
+                log_status_period(notafk_period_start, last_check, "not-afk")
+            afk_state = True
+            afk_period_start = now
+            notafk_period_start = now
+            last_input_time = time.time()
+        last_check = now
 
         # AFK kontrol
         if not afk_state and (time.time() - last_input_time) > afk_timeout:
