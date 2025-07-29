@@ -856,7 +856,8 @@ def get_weekly_report(username: str, week_start: date):
         active = next((row[1] for row in q if row[0] == "not-afk"), 0) or 0
         afk = next((row[1] for row in q if row[0] == "afk"), 0) or 0
 
-        # Determine start and end times using ReportLog records
+        # Determine start and end times using ReportLog records.
+        # Start time is the first log for the day (any status except "offline").
         day_start = datetime.combine(day, datetime.min.time())
         day_end = day_start + timedelta(days=1)
 
@@ -864,9 +865,9 @@ def get_weekly_report(username: str, week_start: date):
             db.session.query(ReportLog)
             .filter(
                 ReportLog.username == username,
-                ReportLog.status == "online",
                 ReportLog.created_at >= day_start,
                 ReportLog.created_at < day_end,
+                ReportLog.status != "offline",
             )
             .order_by(ReportLog.created_at)
             .first()
