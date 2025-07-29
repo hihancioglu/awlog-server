@@ -658,7 +658,9 @@ def get_today_user_details():
 
     rep_map = {r.username: r.status for r in rep_q}
 
+    offset = app.config.get("TIMEZONE_OFFSET", 0)
     now = datetime.utcnow()
+    today_start = local_now().replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(hours=offset)
     for st in state_q:
         item = totals.setdefault(
             st.username,
@@ -670,12 +672,14 @@ def get_today_user_details():
             },
         )
         if rep_map.get(st.username) != "offline":
-            delta = int((now - st.created_at).total_seconds())
-            item["total"] += delta
-            if st.status == "not-afk":
-                item["active"] += delta
-            else:
-                item["afk"] += delta
+            start = max(st.created_at, today_start)
+            if start < now:
+                delta = int((now - start).total_seconds())
+                item["total"] += delta
+                if st.status == "not-afk":
+                    item["active"] += delta
+                else:
+                    item["afk"] += delta
 
     return list(totals.values())
 
