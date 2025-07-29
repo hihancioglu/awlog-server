@@ -646,7 +646,7 @@ class MainWindow(QWidget):
         if report_status("not-afk"):
             self.record_server_contact()
         self.status_label.setText("Durum: Aktif (Evden Çalışma Başladı)")
-        self.logla("Online bildirildi, takip başladı.")
+        self.logla("Online bildirildi, çalışma başladı.")
 
         # LOG İZLEME ve SUNUCUYA GÖNDERME THREAD'LERİ
         self.logging_thread = threading.Thread(target=self.logging_worker, daemon=True)
