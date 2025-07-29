@@ -23,6 +23,11 @@ from debug_utils import DEBUG
 # server. ``MainWindow`` sets this to update the UI.
 LAST_COMM_CALLBACK = None
 
+# Generic log callback used by background functions to append a message to the
+# UI. ``logging_thread_func`` initializes this so functions like ``input_event``
+# can display messages.
+LOG_CALLBACK = None
+
 from PyQt5.QtWidgets import QApplication, QWidget, QPushButton, QVBoxLayout, QTextEdit, QLabel
 from PyQt5.QtGui import QIcon, QTextCursor
 from PyQt5.QtCore import pyqtSignal, pyqtSlot, QTimer
@@ -93,6 +98,7 @@ STATUSLOG_PATH = os.path.join(tempfile.gettempdir(), "statuslog.txt")
 LOG_EMOJIS = {
     "Online bildirildi": "\U0001F7E2",  # ışık yeşili daire
     "AFK oldu": "\U0001F634",  # uyuyan yüz
+    "Aktif": "\U0001F3C3",  # koşan adam
     "VPN KOPUK": "\U0001F6D1",  # dur tabelası
     "Bağlantı geri geldi": "\U0001F501",  # dönen ok
 }
@@ -267,7 +273,7 @@ def log_status_period(start_time, end_time, status):
 
 def input_event():
     """Gerçek bir kullanıcı girdisi olduğunda çağrılır."""
-    global last_input_time, afk_state, afk_period_start, notafk_period_start
+    global last_input_time, afk_state, afk_period_start, notafk_period_start, LOG_CALLBACK
     now = time.time()
     last_input_time = now
     check_macro_pattern(now)
@@ -277,6 +283,8 @@ def input_event():
         notafk_period_start = afk_period_end
         afk_state = False
         report_status_async("not-afk")
+        if LOG_CALLBACK:
+            LOG_CALLBACK("Aktif")
 
 def on_key_press(key):
     """Keyboard press handler that ignores repeated keydown events."""
@@ -311,7 +319,8 @@ def get_active_window_info():
         return None, None
 
 def logging_thread_func(running_flag, log_callback=None):
-    global afk_state, afk_period_start, notafk_period_start, prev_window, prev_process, window_period_start, last_input_time
+    global afk_state, afk_period_start, notafk_period_start, prev_window, prev_process, window_period_start, last_input_time, LOG_CALLBACK
+    LOG_CALLBACK = log_callback
     start_listeners()
     prev_window, prev_process = get_active_window_info()
     window_period_start = datetime.now()
