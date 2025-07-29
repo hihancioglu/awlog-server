@@ -56,7 +56,7 @@ Ayrıca `/`, `/daily_timeline`, `/weekly_report` ve `/usage_report` gibi HTML sa
 `agent` klasörü, Windows için hazırlanmış örnek istemci uygulamasını içerir. Bu istemci; aktif pencere değişimlerini, klavye/fare etkinliklerini ve AFK durumunu tespit ederek düzenli olarak sunucuya gönderir. VPN bağlantısı `baylan.local` adresine erişilerek kontrol edilir. VPN açık olsa da API sunucusuna ulaşılamazsa arayüzde ayrı bir uyarı gösterilir.
 
 Ek olarak kullanıcı girişlerinin çok düzenli aralıklarla gerçekleşip gerçekleşmediği izlenir. Bu tür tutarlılık tespit edildiğinde sunucuya `macro-suspect` bildirimi gönderilerek olası makro kullanımı raporlanır.
-Varsayılan olarak 30 saniyenin altındaki düzenli girdi aralıkları analiz edilir ve 10 ardışık girişte ciddi bir tutarlılık tespit edilirse makro şüphesi raporlanır.
+Varsayılan olarak 15 saniyenin altındaki düzenli girdi aralıkları analiz edilir ve 20 ardışık girişte ciddi bir tutarlılık tespit edilirse makro şüphesi raporlanır.
 
 İstemci, sunucuya ulaşılamadığında log kayıtlarını geçici olarak `windowlog.txt` ve `statuslog.txt` dosyalarına yazar. Bağlantı tekrar sağlandığında bu dosyalardaki veriler otomatik olarak sunucuya iletilir ve başarılı gönderilen satırlar silinir. Bu iletim işlemleri artık asenkron HTTP çağrıları kullanılarak gerçekleşir.
 
