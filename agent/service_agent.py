@@ -219,11 +219,12 @@ def log_status_period(start_time, end_time, status):
     log_queue.put(("status", data))
 
 
-def input_event():
+def input_event(check_macro: bool = True):
     global last_input_time, afk_state, afk_period_start, notafk_period_start
     now = time.time()
     last_input_time = now
-    check_macro_pattern(now)
+    if check_macro:
+        check_macro_pattern(now)
     if afk_state:
         afk_end = datetime.now()
         log_status_period(afk_period_start, afk_end, "afk")
@@ -245,7 +246,7 @@ def on_key_release(key):
 
 def start_listeners():
     mouse.Listener(
-        on_move=lambda *a, **k: input_event(),
+        on_move=lambda *a, **k: input_event(False),
         on_click=lambda *a, **k: input_event(),
         on_scroll=lambda *a, **k: input_event(),
     ).start()

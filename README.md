@@ -57,6 +57,7 @@ Ayrıca `/`, `/daily_timeline`, `/weekly_report` ve `/usage_report` gibi HTML sa
 
 Ek olarak kullanıcı girişlerinin çok düzenli aralıklarla gerçekleşip gerçekleşmediği izlenir. Bu tür tutarlılık tespit edildiğinde sunucuya `macro-suspect` bildirimi gönderilerek olası makro kullanımı raporlanır.
 Varsayılan olarak 15 saniyenin altındaki düzenli girdi aralıkları analiz edilir ve 20 ardışık girişte ciddi bir tutarlılık tespit edilirse makro şüphesi raporlanır.
+Fare hareketleri çok sık tetiklendiğinden bu hareketler makro denetimine dahil edilmez; yalnızca klavye ve tıklama gibi temel girdiler değerlendirilir.
 
 İstemci, sunucuya ulaşılamadığında log kayıtlarını geçici olarak `windowlog.txt` ve `statuslog.txt` dosyalarına yazar. Bağlantı tekrar sağlandığında bu dosyalardaki veriler otomatik olarak sunucuya iletilir ve başarılı gönderilen satırlar silinir. Bu iletim işlemleri artık asenkron HTTP çağrıları kullanılarak gerçekleşir.
 

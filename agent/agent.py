@@ -274,12 +274,17 @@ def log_status_period(start_time, end_time, status):
     log_queue.put(("status", data))
     update_today_counters(cur_start, end_time, status)
 
-def input_event():
-    """Gerçek bir kullanıcı girdisi olduğunda çağrılır."""
+def input_event(check_macro: bool = True):
+    """Gerçek bir kullanıcı girdisi olduğunda çağrılır.
+
+    ``check_macro`` parametresi ``False`` ise makro tespiti yapılmaz. Bu seçenek
+    sık aralıklarla tetiklenen fare hareketlerinde kullanılır.
+    """
     global last_input_time, afk_state, afk_period_start, notafk_period_start, LOG_CALLBACK
     now = time.time()
     last_input_time = now
-    check_macro_pattern(now)
+    if check_macro:
+        check_macro_pattern(now)
     if afk_state:
         afk_period_end = datetime.now()
         log_status_period(afk_period_start, afk_period_end, "afk")
@@ -302,7 +307,7 @@ def on_key_release(key):
 
 def start_listeners():
     mouse.Listener(
-        on_move=lambda *a, **k: input_event(),
+        on_move=lambda *a, **k: input_event(False),
         on_click=lambda *a, **k: input_event(),
         on_scroll=lambda *a, **k: input_event(),
     ).start()
