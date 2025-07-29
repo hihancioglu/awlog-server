@@ -661,11 +661,18 @@ def get_today_user_details():
         & (ReportLog.created_at == rep_sub.c.max_created_at),
     )
 
-    rep_map = {r.username: r.status for r in rep_q}
+    rep_map = {r.username: r for r in rep_q}
 
     offset = app.config.get("TIMEZONE_OFFSET", 0)
+    threshold = (
+        app.config.get("KEEPALIVE_INTERVAL", 120)
+        * app.config.get("OFFLINE_MULTIPLIER", 3)
+    )
     now = datetime.utcnow()
-    today_start = local_now().replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(hours=offset)
+    today_start = (
+        local_now().replace(hour=0, minute=0, second=0, microsecond=0)
+        - timedelta(hours=offset)
+    )
     for st in state_q:
         item = totals.setdefault(
             st.username,
@@ -676,15 +683,23 @@ def get_today_user_details():
                 "afk": 0,
             },
         )
-        if rep_map.get(st.username) != "offline":
-            start = max(st.created_at, today_start)
-            if start < now:
-                delta = int((now - start).total_seconds())
-                item["total"] += delta
-                if st.status == "not-afk":
-                    item["active"] += delta
-                else:
-                    item["afk"] += delta
+
+        rep = rep_map.get(st.username)
+        end = now
+        if rep:
+            if rep.status == "offline":
+                end = rep.created_at
+            elif (now - rep.created_at).total_seconds() > threshold:
+                end = rep.created_at
+
+        start = max(st.created_at, today_start)
+        if end > start:
+            delta = int((end - start).total_seconds())
+            item["total"] += delta
+            if st.status == "not-afk":
+                item["active"] += delta
+            else:
+                item["afk"] += delta
 
     return list(totals.values())
 
