@@ -43,7 +43,6 @@ def start_monitor_thread():
         monitor_thread = threading.Thread(target=monitor_keepalive, daemon=True)
         monitor_thread.start()
 
-start_monitor_thread()
 
 @app.before_first_request
 def setup_db():
@@ -1098,4 +1097,5 @@ def api_logs():
     )
 
 if __name__ == "__main__":
+    start_monitor_thread()
     app.run(host="0.0.0.0", port=5050)

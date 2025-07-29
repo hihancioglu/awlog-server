@@ -8,5 +8,5 @@ services:
       - ./data:/app/data
       - /etc/localtime:/etc/localtime:ro
     environment:
-      - FLASK_ENV=production
+      - FLASK_DEBUG=0
       - TZ=Europe/Istanbul
