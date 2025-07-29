@@ -11,7 +11,8 @@ def create_app() -> Flask:
     load_dotenv()
 
     templates_path = os.path.join(os.path.dirname(__file__), "..", "templates")
-    app = Flask(__name__, template_folder=templates_path)
+    static_path = os.path.join(os.path.dirname(__file__), "..", "static")
+    app = Flask(__name__, template_folder=templates_path, static_folder=static_path)
     app.secret_key = os.environ.get("FLASK_SECRET_KEY", "change-me")
 
     db_path = os.path.join(os.path.dirname(__file__), "..", "data", "awlogs.sqlite")
