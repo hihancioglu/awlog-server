@@ -601,9 +601,9 @@ class MainWindow(QWidget):
         if not self.active:
             return
         if not report_status("online"):
-            self.logla("Online durumu sunucuya iletilemedi.")
+            pass
         if not report_status("not-afk"):
-            self.logla("not-afk durumu sunucuya iletilemedi.")
+            pass
         self.status_label.setText("Durum: Aktif (Evden Çalışma Başladı)")
         self.logla("Online bildirildi, takip başladı.")
 
@@ -628,10 +628,6 @@ class MainWindow(QWidget):
                 log_type, data = log_queue.get(timeout=0.5)
                 ok, status_code, message = send_log_to_server(log_type, data)
                 if not ok:
-                    self.logla(
-                        f"Sunucu log kaydetmedi (HTTP {status_code}): {message.strip()}"
-                    )
-                    # Local dosyada tut, örnek amaçlı
                     path = LOG_PATH if log_type == "window" else STATUSLOG_PATH
                     with open(path, "a", encoding="utf-8") as f:
                         f.write(json.dumps(data, ensure_ascii=False) + "\n")
@@ -639,8 +635,8 @@ class MainWindow(QWidget):
                 # göstermek gereksiz, bu yüzden ek loglama yapılmaz
             except queue.Empty:
                 continue
-            except Exception as e:
-                self.logla(f"Log gönderim hatası: {e}")
+            except Exception:
+                pass
 
     def flush_local_logs(self):
         """Send locally stored logs if any exist."""
@@ -687,17 +683,9 @@ class MainWindow(QWidget):
                 time.sleep(1)
             if not self.active:
                 return
-            sent_keepalive = report_status("keepalive")
+            report_status("keepalive")
             current_status = "afk" if afk_state else "not-afk"
-            sent_state = report_status(current_status)
-            if sent_keepalive and sent_state:
-                self.logla(f"Keepalive ve {current_status} gönderildi.")
-            elif sent_keepalive:
-                self.logla(f"Keepalive gönderildi ancak {current_status} iletilemedi.")
-            elif sent_state:
-                self.logla(f"{current_status} gönderildi ancak keepalive iletilemedi.")
-            else:
-                self.logla(f"Keepalive ve {current_status} gönderilemedi.")
+            report_status(current_status)
 
     def vpn_monitor(self):
         self.forticlient_window_shown = False
@@ -743,9 +731,9 @@ class MainWindow(QWidget):
                 if not was_server:
                     self.flush_local_logs()
                     if not report_status("online"):
-                        self.logla("Online durumu sunucuya iletilemedi.")
+                        pass
                     if not report_status("afk" if afk_state else "not-afk"):
-                        self.logla("Durum bilgisi sunucuya iletilemedi.")
+                        pass
                 self.set_connection_status(True, True)
                 if self.offline_mode:
                     self.logla("Bağlantı geri geldi. Online mod.")
@@ -765,7 +753,7 @@ class MainWindow(QWidget):
 
         self.active = False
         if not report_status("offline"):
-            self.logla("Offline durumu sunucuya iletilemedi.")
+            pass
         kill_all_forticlient_processes()
         self.logla("Offline bildirildi, uygulama kapatıldı.")
 
