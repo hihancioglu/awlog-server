@@ -36,12 +36,18 @@ logger = logging.getLogger(__name__)
 
 monitor_thread = None
 
-@app.before_first_request
-def setup_db():
+def start_monitor_thread():
+    """Ensure the keepalive monitor thread is running."""
     global monitor_thread
     if monitor_thread is None:
         monitor_thread = threading.Thread(target=monitor_keepalive, daemon=True)
         monitor_thread.start()
+
+start_monitor_thread()
+
+@app.before_first_request
+def setup_db():
+    start_monitor_thread()
 
 
 @app.route("/register", methods=["POST"])
