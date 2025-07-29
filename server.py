@@ -302,18 +302,21 @@ def monitor_keepalive():
                 )
 
                 if last_state:
-                    start_time = last_state.created_at
                     status = last_state.status
-                    duration = int((now - start_time).total_seconds())
-                    sl = StatusLog(
-                        hostname=rep.hostname,
-                        username=rep.username,
-                        status=status,
-                        start_time=start_time.isoformat(),
-                        end_time=now.isoformat(),
-                        duration=duration,
-                    )
-                    db.session.add(sl)
+                else:
+                    status = "not-afk"
+
+                start_time = rep.created_at
+                duration = int((now - start_time).total_seconds())
+                sl = StatusLog(
+                    hostname=rep.hostname,
+                    username=rep.username,
+                    status=status,
+                    start_time=start_time.isoformat(),
+                    end_time=now.isoformat(),
+                    duration=duration,
+                )
+                db.session.add(sl)
 
                 offline = ReportLog(
                     hostname=rep.hostname,
