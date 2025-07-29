@@ -1099,15 +1099,16 @@ def api_logs():
             | ApiLog.username.ilike(search)
             | ApiLog.hostname.ilike(search)
         )
+    offset = app.config.get("TIMEZONE_OFFSET", 0)
     if start_param:
         try:
-            start_dt = datetime.fromisoformat(start_param)
+            start_dt = datetime.fromisoformat(start_param) - timedelta(hours=offset)
             query = query.filter(ApiLog.created_at >= start_dt)
         except ValueError:
             pass
     if end_param:
         try:
-            end_dt = datetime.fromisoformat(end_param)
+            end_dt = datetime.fromisoformat(end_param) - timedelta(hours=offset)
             query = query.filter(ApiLog.created_at <= end_dt)
         except ValueError:
             pass
