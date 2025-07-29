@@ -135,6 +135,30 @@ prev_window, prev_process = None, None
 window_period_start = datetime.now()
 pressed_keys = set()
 
+# --- Makro Kullanımını Tespit İçin Girdi Zamanları ---
+input_times = []
+MACRO_CHECK_COUNT = 20  # kontrol için gereken minimum girdi sayısı
+MACRO_STD_THRESHOLD = 0.05  # standart sapmanın ortalamaya oranı
+MACRO_MIN_INTERVAL = 0.2  # saniye
+
+# Makro kullanımını tespit etmek için son giriş zamanlarını analiz eder
+def check_macro_pattern(timestamp: float) -> None:
+    input_times.append(timestamp)
+    if len(input_times) > MACRO_CHECK_COUNT:
+        input_times.pop(0)
+    if len(input_times) < MACRO_CHECK_COUNT:
+        return
+    intervals = [input_times[i + 1] - input_times[i] for i in range(len(input_times) - 1)]
+    avg = sum(intervals) / len(intervals)
+    if avg > MACRO_MIN_INTERVAL:
+        return
+    variance = sum((x - avg) ** 2 for x in intervals) / len(intervals)
+    std_dev = variance ** 0.5
+    if avg > 0 and (std_dev / avg) < MACRO_STD_THRESHOLD:
+        DEBUG(f"Olası makro kullanımı: ort={avg:.3f}s std={std_dev:.3f}s")
+        report_status_async("macro-suspect")
+        input_times.clear()
+
 def get_hostname():
     return socket.gethostname()
 
@@ -246,6 +270,7 @@ def input_event():
     global last_input_time, afk_state, afk_period_start, notafk_period_start
     now = time.time()
     last_input_time = now
+    check_macro_pattern(now)
     if afk_state:
         afk_period_end = datetime.now()
         log_status_period(afk_period_start, afk_period_end, "afk")
