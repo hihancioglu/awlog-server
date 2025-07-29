@@ -1,0 +1,22 @@
+<svg width="500" height="180" viewBox="0 0 500 180" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="500" height="180" fill="white"></rect>
+  <!-- Büyük ev figürü (çatı, gövde, baca) -->
+  <g>
+    <!-- Çatı -->
+    <polyline points="45,110 80,60 115,110" fill="none" stroke="#222" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"></polyline>
+    <!-- Baca -->
+    <rect x="105" y="75" width="7" height="20" rx="2" fill="#222"></rect>
+    <!-- Gövde -->
+    <rect x="55" y="110" width="50" height="40" rx="10" fill="none" stroke="#222" stroke-width="8"></rect>
+    <!-- İnsan başı -->
+    <circle cx="80" cy="125" r="9" fill="#222"></circle>
+    <!-- Omuz ve laptop gövdesi -->
+    <rect x="70" y="135" width="20" height="12" rx="4" fill="#222"></rect>
+    <!-- Laptop ekranı -->
+    <rect x="74" y="143" width="12" height="5" rx="2" fill="#fff"></rect>
+  </g>
+  <!-- BAYLAN -->
+  <text x="135" y="85" font-family="'Segoe UI', 'Arial Rounded MT Bold', Verdana, Arial, sans-serif" font-size="58" font-weight="bold" fill="#D9181C" letter-spacing="3">BAYLAN</text>
+  <!-- EVDEN ÇALIŞMA PANELİ -->
+  <text x="135" y="125" font-family="'Segoe UI', 'Arial Rounded MT Bold', Verdana, Arial, sans-serif" font-size="26" font-weight="bold" fill="#1565B1" letter-spacing="1">EVDEN ÇALIŞMA PANELİ</text>
+</svg>
