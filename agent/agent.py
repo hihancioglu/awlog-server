@@ -19,6 +19,10 @@ from pynput import mouse, keyboard
 
 from debug_utils import DEBUG
 
+# Callback that will be invoked whenever the agent successfully contacts the
+# server. ``MainWindow`` sets this to update the UI.
+LAST_COMM_CALLBACK = None
+
 from PyQt5.QtWidgets import QApplication, QWidget, QPushButton, QVBoxLayout, QTextEdit, QLabel
 from PyQt5.QtGui import QIcon, QTextCursor
 from PyQt5.QtCore import pyqtSignal, pyqtSlot, QTimer
@@ -175,11 +179,14 @@ async def _send_log_to_server(log_type, data):
             headers=headers,
             timeout=2,
         )
-        if response.status_code != 200:
-            DEBUG(
-                f"send_log_to_server failed status={response.status_code} "
-                f"resp={response.text.strip()}"
-            )
+        if response.status_code == 200 and LAST_COMM_CALLBACK:
+            LAST_COMM_CALLBACK()
+        else:
+            if response.status_code != 200:
+                DEBUG(
+                    f"send_log_to_server failed status={response.status_code} "
+                    f"resp={response.text.strip()}"
+                )
         return response.status_code == 200, response.status_code, response.text
     except Exception as e:
         DEBUG(f"send_log_to_server exception: {e}")
@@ -351,7 +358,10 @@ async def _report_status(status):
             headers={"Content-Type": "application/json", "X-Signature": sig},
             timeout=5,
         )
-        if r.status_code != 200:
+        if r.status_code == 200:
+            if LAST_COMM_CALLBACK:
+                LAST_COMM_CALLBACK()
+        else:
             DEBUG(
                 f"report_status failed status={r.status_code} resp={r.text.strip()}"
             )
@@ -391,7 +401,10 @@ async def _report_window(window_title, process_name):
             headers={"Content-Type": "application/json", "X-Signature": sig},
             timeout=5,
         )
-        if r.status_code != 200:
+        if r.status_code == 200:
+            if LAST_COMM_CALLBACK:
+                LAST_COMM_CALLBACK()
+        else:
             DEBUG(
                 f"report_window failed status={r.status_code} resp={r.text.strip()}"
             )
@@ -451,6 +464,7 @@ class MainWindow(QWidget):
         self.version_label = QLabel(f"Versiyon: {AGENT_VERSION}")
         self.active_time_label = QLabel("Bugün Aktif: 0:00")
         self.afk_time_label = QLabel("Bugün AFK: 0:00")
+        self.last_comm_label = QLabel("Son İletişim: -")
         self.log = QTextEdit()
         self.log.setReadOnly(True)
         # Versiyon bilgisini log ekranına da yaz
@@ -463,6 +477,7 @@ class MainWindow(QWidget):
         layout.addWidget(self.version_label)
         layout.addWidget(self.active_time_label)
         layout.addWidget(self.afk_time_label)
+        layout.addWidget(self.last_comm_label)
         layout.addWidget(self.log)
         self.setLayout(layout)
 
@@ -473,6 +488,11 @@ class MainWindow(QWidget):
         self.logging_flag.clear()
         self.logging_thread = None
         self.log_sender_thread = None
+        # Sunucuya ulaşılamadığında devreye giren offline mod durumu
+        self.offline_mode = False
+
+        # Son başarılı sunucu iletişim zamanı
+        self.last_comm = None
 
         self.append_log.connect(self._append_log)
 
@@ -481,6 +501,10 @@ class MainWindow(QWidget):
         self.timer.timeout.connect(self.update_time_labels)
         self.timer.start()
         self.update_time_labels()
+
+        # Update global callback so lower level functions can notify UI
+        global LAST_COMM_CALLBACK
+        LAST_COMM_CALLBACK = self.record_server_contact
 
     def set_connection_status(self, vpn_ok: bool, server_ok: bool):
         """Update status label depending on VPN and server reachability."""
@@ -498,6 +522,13 @@ class MainWindow(QWidget):
     def _append_log(self, text):
         self.log.append(text)
         self.log.moveCursor(QTextCursor.End)  # Oto-scroll
+
+    def record_server_contact(self):
+        """Record current time as last successful server communication."""
+        self.last_comm = datetime.now()
+        self.last_comm_label.setText(
+            f"Son İletişim: {self.last_comm.strftime('%H:%M:%S')}"
+        )
 
     def update_time_labels(self):
         """Update active/AFK labels with running totals."""
@@ -598,10 +629,10 @@ class MainWindow(QWidget):
         self.fetch_today_totals()
         if not self.active:
             return
-        if not report_status("online"):
-            self.logla("Online durumu sunucuya iletilemedi.")
-        if not report_status("not-afk"):
-            self.logla("not-afk durumu sunucuya iletilemedi.")
+        if report_status("online"):
+            self.record_server_contact()
+        if report_status("not-afk"):
+            self.record_server_contact()
         self.status_label.setText("Durum: Aktif (Evden Çalışma Başladı)")
         self.logla("Online bildirildi, takip başladı.")
 
@@ -625,11 +656,9 @@ class MainWindow(QWidget):
             try:
                 log_type, data = log_queue.get(timeout=0.5)
                 ok, status_code, message = send_log_to_server(log_type, data)
-                if not ok:
-                    self.logla(
-                        f"Sunucu log kaydetmedi (HTTP {status_code}): {message.strip()}"
-                    )
-                    # Local dosyada tut, örnek amaçlı
+                if ok:
+                    self.record_server_contact()
+                else:
                     path = LOG_PATH if log_type == "window" else STATUSLOG_PATH
                     with open(path, "a", encoding="utf-8") as f:
                         f.write(json.dumps(data, ensure_ascii=False) + "\n")
@@ -637,8 +666,8 @@ class MainWindow(QWidget):
                 # göstermek gereksiz, bu yüzden ek loglama yapılmaz
             except queue.Empty:
                 continue
-            except Exception as e:
-                self.logla(f"Log gönderim hatası: {e}")
+            except Exception:
+                pass
 
     def flush_local_logs(self):
         """Send locally stored logs if any exist."""
@@ -657,7 +686,9 @@ class MainWindow(QWidget):
                         data = json.loads(line)
                         log_type = data.get("log_type")
                         ok, _, _ = send_log_to_server(log_type, data)
-                        if not ok:
+                        if ok:
+                            self.record_server_contact()
+                        else:
                             remaining.append(line)
                     except Exception:
                         remaining.append(line)
@@ -685,17 +716,11 @@ class MainWindow(QWidget):
                 time.sleep(1)
             if not self.active:
                 return
-            sent_keepalive = report_status("keepalive")
+            if report_status("keepalive"):
+                self.record_server_contact()
             current_status = "afk" if afk_state else "not-afk"
-            sent_state = report_status(current_status)
-            if sent_keepalive and sent_state:
-                self.logla(f"Keepalive ve {current_status} gönderildi.")
-            elif sent_keepalive:
-                self.logla(f"Keepalive gönderildi ancak {current_status} iletilemedi.")
-            elif sent_state:
-                self.logla(f"{current_status} gönderildi ancak keepalive iletilemedi.")
-            else:
-                self.logla(f"Keepalive ve {current_status} gönderilemedi.")
+            if report_status(current_status):
+                self.record_server_contact()
 
     def vpn_monitor(self):
         self.forticlient_window_shown = False
@@ -721,20 +746,33 @@ class MainWindow(QWidget):
                     else:
                         self.logla("FortiClient zaten açık.")
                     self.forticlient_window_shown = True
+                if not self.offline_mode:
+                    self.logla(
+                        "Sunucu ile bağlantı kurulamıyor. Offline mod aktif edildi. Kayıtlar localde tutuluyor, bağlantı geri geldiğinde sunucuya iletilecektir."
+                    )
+                    self.offline_mode = True
                 self.logla("VPN KOPUK. Bağlantı bekleniyor...")
             elif not server_ok:
                 self.set_connection_status(True, False)
+                if not self.offline_mode:
+                    self.logla(
+                        "Sunucu ile bağlantı kurulamıyor. Offline mod aktif edildi. Kayıtlar localde tutuluyor, bağlantı geri geldiğinde sunucuya iletilecektir."
+                    )
+                    self.offline_mode = True
                 self.logla("VPN var ancak API sunucusuna erişilemiyor.")
             else:
                 if self.forticlient_window_shown or not was_vpn:
                     self.logla("VPN bağlantısı tekrar sağlandı.")
                 if not was_server:
                     self.flush_local_logs()
-                    if not report_status("online"):
-                        self.logla("Online durumu sunucuya iletilemedi.")
-                    if not report_status("afk" if afk_state else "not-afk"):
-                        self.logla("Durum bilgisi sunucuya iletilemedi.")
+                    if report_status("online"):
+                        self.record_server_contact()
+                    if report_status("afk" if afk_state else "not-afk"):
+                        self.record_server_contact()
                 self.set_connection_status(True, True)
+                if self.offline_mode:
+                    self.logla("Bağlantı geri geldi. Online mod.")
+                    self.offline_mode = False
                 self.forticlient_window_shown = False
             was_vpn = vpn_ok
             was_server = server_ok
@@ -749,8 +787,8 @@ class MainWindow(QWidget):
             log_status_period(notafk_period_start, now, "not-afk")
 
         self.active = False
-        if not report_status("offline"):
-            self.logla("Offline durumu sunucuya iletilemedi.")
+        if report_status("offline"):
+            self.record_server_contact()
         kill_all_forticlient_processes()
         self.logla("Offline bildirildi, uygulama kapatıldı.")
 
