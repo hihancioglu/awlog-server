@@ -473,6 +473,8 @@ class MainWindow(QWidget):
         self.logging_flag.clear()
         self.logging_thread = None
         self.log_sender_thread = None
+        # Sunucuya ulaşılamadığında devreye giren offline mod durumu
+        self.offline_mode = False
 
         self.append_log.connect(self._append_log)
 
@@ -721,9 +723,19 @@ class MainWindow(QWidget):
                     else:
                         self.logla("FortiClient zaten açık.")
                     self.forticlient_window_shown = True
+                if not self.offline_mode:
+                    self.logla(
+                        "Sunucu ile bağlantı kurulamıyor. Offline mod aktif edildi. Kayıtlar localde tutuluyor, bağlantı geri geldiğinde sunucuya iletilecektir."
+                    )
+                    self.offline_mode = True
                 self.logla("VPN KOPUK. Bağlantı bekleniyor...")
             elif not server_ok:
                 self.set_connection_status(True, False)
+                if not self.offline_mode:
+                    self.logla(
+                        "Sunucu ile bağlantı kurulamıyor. Offline mod aktif edildi. Kayıtlar localde tutuluyor, bağlantı geri geldiğinde sunucuya iletilecektir."
+                    )
+                    self.offline_mode = True
                 self.logla("VPN var ancak API sunucusuna erişilemiyor.")
             else:
                 if self.forticlient_window_shown or not was_vpn:
@@ -735,6 +747,9 @@ class MainWindow(QWidget):
                     if not report_status("afk" if afk_state else "not-afk"):
                         self.logla("Durum bilgisi sunucuya iletilemedi.")
                 self.set_connection_status(True, True)
+                if self.offline_mode:
+                    self.logla("Bağlantı geri geldi. Online mod.")
+                    self.offline_mode = False
                 self.forticlient_window_shown = False
             was_vpn = vpn_ok
             was_server = server_ok
