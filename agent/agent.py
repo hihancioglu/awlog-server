@@ -89,6 +89,14 @@ log_queue = queue.Queue()
 LOG_PATH = os.path.join(tempfile.gettempdir(), "windowlog.txt")
 STATUSLOG_PATH = os.path.join(tempfile.gettempdir(), "statuslog.txt")
 
+# Log mesajlarının başına eklenecek emojiler
+LOG_EMOJIS = {
+    "Online bildirildi": "\U0001F7E2",  # ışık yeşili daire
+    "AFK oldu": "\U0001F634",  # uyuyan yüz
+    "VPN KOPUK": "\U0001F6D1",  # dur tabelası
+    "Bağlantı geri geldi": "\U0001F501",  # dönen ok
+}
+
 # --- Bugünü Anlık Aktif/AFK Sayaçları ---
 today_active_seconds = 0
 today_afk_seconds = 0
@@ -520,6 +528,10 @@ class MainWindow(QWidget):
 
     @pyqtSlot(str)
     def _append_log(self, text):
+        for key, emoji in LOG_EMOJIS.items():
+            if text.startswith(key):
+                text = f"{emoji} {text}"
+                break
         self.log.append(text)
         self.log.moveCursor(QTextCursor.End)  # Oto-scroll
 
