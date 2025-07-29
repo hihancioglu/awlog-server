@@ -1081,6 +1081,10 @@ def api_logs():
     q = request.args.get("q", "").strip().lower()
     username = request.args.get("username")
     endpoint = request.args.get("endpoint")
+    start_param = request.args.get("start")
+    end_param = request.args.get("end")
+    payload_field = request.args.get("field")
+    payload_value = request.args.get("value")
 
     query = ApiLog.query
     if username:
@@ -1095,6 +1099,24 @@ def api_logs():
             | ApiLog.username.ilike(search)
             | ApiLog.hostname.ilike(search)
         )
+    if start_param:
+        try:
+            start_dt = datetime.fromisoformat(start_param)
+            query = query.filter(ApiLog.created_at >= start_dt)
+        except ValueError:
+            pass
+    if end_param:
+        try:
+            end_dt = datetime.fromisoformat(end_param)
+            query = query.filter(ApiLog.created_at <= end_dt)
+        except ValueError:
+            pass
+    if payload_field and payload_value:
+        search = f'%"{payload_field}": "{payload_value}"%'
+        query = query.filter(ApiLog.payload.ilike(search))
+    elif payload_field:
+        search = f'%"{payload_field}":%'
+        query = query.filter(ApiLog.payload.ilike(search))
 
     logs = query.order_by(ApiLog.created_at.desc()).limit(100).all()
 
@@ -1109,6 +1131,10 @@ def api_logs():
         selected_user=username or "",
         selected_endpoint=endpoint or "",
         q=q,
+        start=start_param or "",
+        end=end_param or "",
+        field=payload_field or "",
+        value=payload_value or "",
     )
 
 if __name__ == "__main__":
