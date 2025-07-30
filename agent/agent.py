@@ -90,6 +90,8 @@ AGENT_SECRET = None
 
 # ----- LOG (AFK/AKTİF & PENCERE TAKİBİ) -----
 afk_timeout = 60  # saniye (AFK için 1dk uygundur)
+# Ağ trafiğinin aktif sayılması için gereken minimum byte miktarı
+net_active_threshold = 1024  # 1 KB
 log_queue = queue.Queue()
 LOG_PATH = os.path.join(tempfile.gettempdir(), "windowlog.txt")
 STATUSLOG_PATH = os.path.join(tempfile.gettempdir(), "statuslog.txt")
@@ -348,12 +350,23 @@ def logging_thread_func(running_flag, log_callback=None):
         window_changed = current_window != prev_window or current_process != prev_process
 
         net_now = psutil.net_io_counters()
-        net_diff = (net_now.bytes_sent - net_prev.bytes_sent) + (net_now.bytes_recv - net_prev.bytes_recv)
+        net_diff = (
+            net_now.bytes_sent - net_prev.bytes_sent
+        ) + (
+            net_now.bytes_recv - net_prev.bytes_recv
+        )
         net_prev = net_now
 
         idle = get_idle_seconds()
         locked = is_workstation_locked()
-        is_active = (not locked) and (idle <= afk_timeout or net_diff > 0 or window_changed)
+        is_active = (
+            not locked
+            and (
+                idle <= afk_timeout
+                or net_diff > net_active_threshold
+                or window_changed
+            )
+        )
 
         if window_changed:
             log_window_period(prev_window, prev_process, window_period_start, now)
