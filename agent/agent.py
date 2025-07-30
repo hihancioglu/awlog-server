@@ -91,7 +91,7 @@ AGENT_SECRET = None
 # ----- LOG (AFK/AKTİF & PENCERE TAKİBİ) -----
 afk_timeout = 60  # saniye (AFK için 1dk uygundur)
 # Ağ trafiğinin aktif sayılması için gereken minimum byte miktarı
-net_active_threshold = 1024  # 1 KB
+net_active_threshold = 1024 * 1024  # 1 MB
 # Ağ trafiğini daha stabil ölçmek için son birkaç saniyelik toplam
 # bayt miktarı değerlendirilir. Böylece küçük dalgalanmalar sürekli
 # "Aktif"/"AFK" geçişine neden olmaz.
