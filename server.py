@@ -851,6 +851,29 @@ def agent_today_totals():
     return jsonify({"username": username, "total": 0, "active": 0, "afk": 0})
 
 
+@app.route("/agent/config", methods=["POST"])
+def agent_config():
+    """Return macro recorder configuration for an agent."""
+    raw_payload = request.get_data()
+    data = json.loads(raw_payload.decode("utf-8"))
+    hostname = data.get("hostname")
+    username = data.get("username")
+    agent = AgentSecret.query.filter_by(hostname=hostname, username=username).first()
+    sig = request.headers.get("X-Signature", "")
+    if not agent:
+        return jsonify({"error": "forbidden"}), 403
+    expected = hmac.new(agent.secret.encode(), raw_payload, hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(expected, sig):
+        return jsonify({"error": "forbidden"}), 403
+    return jsonify(
+        {
+            "blacklist": os.environ.get("MACRO_PROC_BLACKLIST", ""),
+            "whitelist": os.environ.get("MACRO_PROC_WHITELIST", ""),
+            "check_interval": float(os.environ.get("MACRO_PROC_CHECK_INTERVAL", "10")),
+        }
+    )
+
+
 @app.route("/api/current_status")
 @login_required
 def api_current_status():
