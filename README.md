@@ -59,7 +59,7 @@ ve uyarı mesajlarını yazar.
 Ayrıca `/`, `/daily_timeline`, `/weekly_report` ve `/usage_report` gibi HTML sayfaları mevcuttur.
 
 ## İstemci (Agent)
-`agent` klasörü, Windows için hazırlanmış örnek istemci uygulamasını içerir. Bu istemci; aktif pencere değişimlerini izler, sistemdeki son giriş zamanını ve ağ trafiğini değerlendirerek AFK durumunu tahmin eder ve bu verileri düzenli olarak sunucuya gönderir. VPN bağlantısı `baylan.local` adresine erişilerek kontrol edilir. VPN açık olsa da API sunucusuna ulaşılamazsa arayüzde ayrı bir uyarı gösterilir.
+`agent` klasörü, Windows için hazırlanmış örnek istemci uygulamasını içerir. Bu istemci; aktif pencere değişimlerini izler, sistemdeki son giriş zamanını ve ağ trafiğini değerlendirerek AFK durumunu tahmin eder ve bu verileri düzenli olarak sunucuya gönderir. Windows kilitlenirse AFK durumu anında bildirilir. VPN bağlantısı `baylan.local` adresine erişilerek kontrol edilir. VPN açık olsa da API sunucusuna ulaşılamazsa arayüzde ayrı bir uyarı gösterilir.
 
 Ek olarak çalışmakta olan süreçler kara listeye göre taranarak bilinen makro kaydedici programlar tespit edilmeye çalışılır ve gerekirse `macro-suspect` bildirimi gönderilir.
 
