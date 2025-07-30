@@ -143,18 +143,10 @@ prev_window, prev_process = None, None
 window_period_start = datetime.now()
 
 # --- Makro Kaydedici Process Tespiti ---
-# Process lists are loaded from environment variables
-MACRO_PROC_BLACKLIST = {
-    p.strip().lower()
-    for p in os.environ.get("MACRO_PROC_BLACKLIST", "").split(",")
-    if p.strip()
-}
-MACRO_PROC_WHITELIST = {
-    p.strip().lower()
-    for p in os.environ.get("MACRO_PROC_WHITELIST", "").split(",")
-    if p.strip()
-}
-MACRO_PROC_CHECK_INTERVAL = float(os.environ.get("MACRO_PROC_CHECK_INTERVAL", "10"))
+# Lists will be fetched from the server at startup
+MACRO_PROC_BLACKLIST = set()
+MACRO_PROC_WHITELIST = set()
+MACRO_PROC_CHECK_INTERVAL = 10.0
 last_macro_proc_check = 0.0
 
 
@@ -645,6 +637,36 @@ class MainWindow(QWidget):
         except Exception:
             pass
 
+    def fetch_macro_config(self):
+        """Sunucudan makro kaydedici ayarlarını al."""
+        global MACRO_PROC_BLACKLIST, MACRO_PROC_WHITELIST, MACRO_PROC_CHECK_INTERVAL
+        try:
+            load_secret()
+            data = {"username": get_username(), "hostname": get_hostname()}
+            payload = json.dumps(data, ensure_ascii=False, separators=(",", ":"))
+            sig = hmac.new(AGENT_SECRET.encode(), payload.encode(), hashlib.sha256).hexdigest()
+            r = requests.post(
+                f"{SERVER_URL}/agent/config",
+                data=payload.encode(),
+                headers={"Content-Type": "application/json", "X-Signature": sig},
+                timeout=5,
+            )
+            if r.status_code == 200:
+                cfg = r.json()
+                MACRO_PROC_BLACKLIST = {
+                    p.strip().lower()
+                    for p in (cfg.get("blacklist") or "").split(",")
+                    if p.strip()
+                }
+                MACRO_PROC_WHITELIST = {
+                    p.strip().lower()
+                    for p in (cfg.get("whitelist") or "").split(",")
+                    if p.strip()
+                }
+                MACRO_PROC_CHECK_INTERVAL = float(cfg.get("check_interval") or 10)
+        except Exception:
+            pass
+
     def baslat(self):
         self.basla_btn.setEnabled(False)
         self.bitir_btn.setEnabled(True)
@@ -700,6 +722,7 @@ class MainWindow(QWidget):
         if not self.active:
             return
         self.fetch_today_totals()
+        self.fetch_macro_config()
         if not self.active:
             return
         if report_status("online"):

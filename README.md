@@ -41,17 +41,18 @@ ve uyarı mesajlarını yazar.
 - `LOG_DIR` – Sunucu günlüklerinin yazılacağı klasör (varsayılan `logs`).
 - `DEBUG` – `1` veya `true` ise ek hata ayıklama mesajları loglanır.
 - `MACRO_PROC_BLACKLIST` – Makro kaydedici olarak kabul edilen işlem
-  isimlerinin virgülle ayrılmış listesi.
+  isimlerinin virgülle ayrılmış listesi (sunucu tarafında tutulur).
 - `MACRO_PROC_WHITELIST` – Tespit edilse de yoksayılacak işlem
-  isimlerinin virgülle ayrılmış listesi.
+  isimlerinin virgülle ayrılmış listesi (sunucu tarafında tutulur).
 - `MACRO_PROC_CHECK_INTERVAL` – Süreç listesinin kaç saniyede bir
-  taranacağı (varsayılan 10).
+  taranacağı (varsayılan 10, sunucu tarafında tutulur).
 
 ## API Uç Noktaları
 - `POST /register` – İstemciye benzersiz bir gizli anahtar döner.
 - `POST /api/log` – `log_type` alanı "window" veya "status" olduğunda ilgili verileri kaydeder.
 - `POST /report` – Kullanıcının çevrim içi/çevrim dışı/afk durumunu veya güncel pencere bilgisini bildirir.
   - `status` alanı `window` ise `window_title` ve `process_name` gönderilmelidir.
+- `POST /agent/config` – Makro kaydedici kara listesi ve ilgili ayarları döndürür.
 - `GET /api/statuslogs` – Son 50 durum kaydını JSON olarak döndürür.
 - `GET /api/window_usage` – Belirtilen kullanıcı için pencere kullanım süresi özetini döndürür.
 - `GET /api_logs` – Tüm API isteklerinin ham loglarını görüntüler (sadece admin).
@@ -62,6 +63,7 @@ Ayrıca `/`, `/daily_timeline`, `/weekly_report` ve `/usage_report` gibi HTML sa
 `agent` klasörü, Windows için hazırlanmış örnek istemci uygulamasını içerir. Bu istemci; aktif pencere değişimlerini izler, sistemdeki son giriş zamanını ve ağ trafiğini değerlendirerek AFK durumunu tahmin eder ve bu verileri düzenli olarak sunucuya gönderir. Windows kilitlenirse AFK durumu anında bildirilir. VPN bağlantısı `baylan.local` adresine erişilerek kontrol edilir. VPN açık olsa da API sunucusuna ulaşılamazsa arayüzde ayrı bir uyarı gösterilir.
 
 Ek olarak çalışmakta olan süreçler kara listeye göre taranarak bilinen makro kaydedici programlar tespit edilmeye çalışılır ve gerekirse `macro-suspect` bildirimi gönderilir.
+Makro kara listesi ve tarama aralığı artık istemcinin `.env` dosyasında tutulmaz; bu ayarlar sunucu tarafındaki ortam değişkenlerinden okunur ve istemci başlangıçta `/agent/config` uç noktasından çekilir.
 
 İstemci, sunucuya ulaşılamadığında log kayıtlarını geçici olarak `windowlog.txt` ve `statuslog.txt` dosyalarına yazar. Bağlantı tekrar sağlandığında bu dosyalardaki veriler otomatik olarak sunucuya iletilir ve başarılı gönderilen satırlar silinir. Bu iletim işlemleri artık asenkron HTTP çağrıları kullanılarak gerçekleşir.
 

@@ -176,18 +176,10 @@ def report_window(window_title, process_name):
 
 # ---- Logging helpers ----
 
-# Macro recorder process detection
-MACRO_PROC_BLACKLIST = {
-    p.strip().lower()
-    for p in os.environ.get("MACRO_PROC_BLACKLIST", "").split(",")
-    if p.strip()
-}
-MACRO_PROC_WHITELIST = {
-    p.strip().lower()
-    for p in os.environ.get("MACRO_PROC_WHITELIST", "").split(",")
-    if p.strip()
-}
-MACRO_PROC_CHECK_INTERVAL = float(os.environ.get("MACRO_PROC_CHECK_INTERVAL", "10"))
+# Macro recorder process detection (lists fetched from server)
+MACRO_PROC_BLACKLIST = set()
+MACRO_PROC_WHITELIST = set()
+MACRO_PROC_CHECK_INTERVAL = 10.0
 last_macro_proc_check = 0.0
 
 
@@ -377,11 +369,37 @@ def flush_local_logs():
                     f.write("\n".join(remaining) + "\n")
             except Exception:
                 pass
-        else:
-            try:
-                os.remove(path)
-            except Exception:
-                pass
+
+
+def fetch_macro_config():
+    """Retrieve macro recorder settings from the server."""
+    global MACRO_PROC_BLACKLIST, MACRO_PROC_WHITELIST, MACRO_PROC_CHECK_INTERVAL
+    try:
+        load_secret()
+        data = {"username": get_username(), "hostname": get_hostname()}
+        payload = json.dumps(data, ensure_ascii=False, separators=(",", ":"))
+        sig = hmac.new(AGENT_SECRET.encode(), payload.encode(), hashlib.sha256).hexdigest()
+        r = requests.post(
+            f"{SERVER_URL}/agent/config",
+            data=payload.encode(),
+            headers={"Content-Type": "application/json", "X-Signature": sig},
+            timeout=5,
+        )
+        if r.status_code == 200:
+            cfg = r.json()
+            MACRO_PROC_BLACKLIST = {
+                p.strip().lower()
+                for p in (cfg.get("blacklist") or "").split(",")
+                if p.strip()
+            }
+            MACRO_PROC_WHITELIST = {
+                p.strip().lower()
+                for p in (cfg.get("whitelist") or "").split(",")
+                if p.strip()
+            }
+            MACRO_PROC_CHECK_INTERVAL = float(cfg.get("check_interval") or 10)
+    except Exception as e:
+        DEBUG(f"fetch_macro_config error: {e}")
 
 
 def keepalive_worker(running_flag):
@@ -414,6 +432,7 @@ class AWLogService(win32serviceutil.ServiceFramework):
 
     def SvcDoRun(self):
         self.running_flag.set()
+        fetch_macro_config()
         threading.Thread(target=logging_thread_func, args=(self.running_flag,), daemon=True).start()
         threading.Thread(target=log_sender_worker, args=(self.running_flag,), daemon=True).start()
         threading.Thread(target=keepalive_worker, args=(self.running_flag,), daemon=True).start()
