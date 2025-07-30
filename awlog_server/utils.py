@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ldap3
+import re
 from datetime import datetime, timedelta
 from functools import wraps
 from flask import session, redirect, url_for, request, current_app
@@ -72,6 +73,9 @@ def get_app_from_window(title: str, process: str) -> str:
 
     browsers = {"chrome", "msedge", "firefox", "opera", "iexplore"}
     if proc in browsers:
+        m = re.search(r"([A-Za-z0-9.-]+\.[A-Za-z]{2,})", title or "")
+        if m:
+            return m.group(1).lower()
         parts = [p.strip() for p in (title or "").split(" - ")]
         for part in reversed(parts):
             if "." in part:
