@@ -21,9 +21,6 @@ import win32event
 import servicemanager
 
 from debug_utils import DEBUG
-from dotenv import load_dotenv
-
-load_dotenv()
 
 # ---- Configuration ----
 SERVER_URL = "http://baylan-portainer:5050"

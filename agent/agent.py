@@ -18,9 +18,6 @@ from datetime import datetime, timedelta
 import ctypes
 
 from debug_utils import DEBUG
-from dotenv import load_dotenv
-
-load_dotenv()
 
 # Callback that will be invoked whenever the agent successfully contacts the
 # server. ``MainWindow`` sets this to update the UI.
