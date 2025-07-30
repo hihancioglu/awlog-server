@@ -13,7 +13,7 @@ import socket
 import hmac
 import hashlib
 from datetime import datetime, timedelta
-from pynput import mouse, keyboard
+import ctypes
 
 import win32serviceutil
 import win32service
@@ -38,13 +38,11 @@ STATUSLOG_PATH = os.path.join(tempfile.gettempdir(), "statuslog.txt")
 
 # afk tracking
 afk_timeout = 60  # seconds
-last_input_time = time.time()
 afk_state = False
 afk_period_start = datetime.now()
 notafk_period_start = datetime.now()
 prev_window, prev_process = None, None
 window_period_start = datetime.now()
-pressed_keys = set()
 
 # ---- Helper functions ----
 
@@ -177,14 +175,6 @@ def report_window(window_title, process_name):
 
 
 # ---- Logging helpers ----
-input_times = []
-MACRO_CHECK_COUNT = 10
-MACRO_STD_THRESHOLD = 0.05
-MACRO_MIN_INTERVAL = 30.0
-
-# Fare hareketlerinin makro kontrolü için minimum aralık (saniye)
-MOUSE_MACRO_INTERVAL = 0.5
-last_mouse_macro_check = 0.0
 
 # Macro recorder process detection
 MACRO_PROC_BLACKLIST = {
@@ -200,22 +190,6 @@ MACRO_PROC_WHITELIST = {
 MACRO_PROC_CHECK_INTERVAL = float(os.environ.get("MACRO_PROC_CHECK_INTERVAL", "10"))
 last_macro_proc_check = 0.0
 
-def check_macro_pattern(ts: float) -> None:
-    input_times.append(ts)
-    if len(input_times) > MACRO_CHECK_COUNT:
-        input_times.pop(0)
-    if len(input_times) < MACRO_CHECK_COUNT:
-        return
-    intervals = [input_times[i+1] - input_times[i] for i in range(len(input_times)-1)]
-    avg = sum(intervals) / len(intervals)
-    if avg > MACRO_MIN_INTERVAL:
-        return
-    variance = sum((x - avg) ** 2 for x in intervals) / len(intervals)
-    std_dev = variance ** 0.5
-    if avg > 0 and (std_dev / avg) < MACRO_STD_THRESHOLD:
-        DEBUG(f"Olası makro kullanımı: ort={avg:.3f}s std={std_dev:.3f}s")
-        report_status_async("macro-suspect")
-        input_times.clear()
 
 def check_macro_processes() -> None:
     """Scan running processes for known macro recorders."""
@@ -260,49 +234,6 @@ def log_status_period(start_time, end_time, status):
     log_queue.put(("status", data))
 
 
-def input_event(check_macro: bool = True):
-    global last_input_time, afk_state, afk_period_start, notafk_period_start
-    now = time.time()
-    last_input_time = now
-    if check_macro:
-        check_macro_pattern(now)
-    if afk_state:
-        afk_end = datetime.now()
-        log_status_period(afk_period_start, afk_end, "afk")
-        notafk_period_start = afk_end
-        afk_state = False
-        report_status_async("not-afk")
-
-
-def on_key_press(key):
-    if key not in pressed_keys:
-        pressed_keys.add(key)
-        input_event()
-
-
-def on_key_release(key):
-    pressed_keys.discard(key)
-    input_event()
-
-
-def on_mouse_move(x, y):
-    """Handle mouse move events with throttled macro checks."""
-    global last_mouse_macro_check
-    now = time.time()
-    if now - last_mouse_macro_check >= MOUSE_MACRO_INTERVAL:
-        last_mouse_macro_check = now
-        input_event(True)
-    else:
-        input_event(False)
-
-
-def start_listeners():
-    mouse.Listener(
-        on_move=on_mouse_move,
-        on_click=lambda *a, **k: input_event(),
-        on_scroll=lambda *a, **k: input_event(),
-    ).start()
-    keyboard.Listener(on_press=on_key_press, on_release=on_key_release).start()
 
 
 def get_active_window_info():
@@ -319,14 +250,29 @@ def get_active_window_info():
         return None, None
 
 
+def get_idle_seconds() -> float:
+    class LASTINPUTINFO(ctypes.Structure):
+        _fields_ = [
+            ("cbSize", ctypes.c_uint),
+            ("dwTime", ctypes.c_uint),
+        ]
+
+    info = LASTINPUTINFO()
+    info.cbSize = ctypes.sizeof(LASTINPUTINFO)
+    if ctypes.windll.user32.GetLastInputInfo(ctypes.byref(info)):
+        millis = ctypes.windll.kernel32.GetTickCount() - info.dwTime
+        return millis / 1000.0
+    return 0.0
+
+
 def logging_thread_func(running_flag):
-    global afk_state, afk_period_start, notafk_period_start, prev_window, prev_process, window_period_start, last_input_time
-    start_listeners()
+    global afk_state, afk_period_start, notafk_period_start, prev_window, prev_process, window_period_start
     prev_window, prev_process = get_active_window_info()
     window_period_start = datetime.now()
     notafk_period_start = window_period_start
     report_window(prev_window, prev_process)
     last_check = datetime.now()
+    net_prev = psutil.net_io_counters()
 
     while running_flag.is_set():
         now = datetime.now()
@@ -337,22 +283,35 @@ def logging_thread_func(running_flag):
             afk_state = True
             afk_period_start = now
             notafk_period_start = now
-            last_input_time = time.time()
         last_check = now
 
-        if not afk_state and (time.time() - last_input_time) > afk_timeout:
-            log_status_period(notafk_period_start, now, "not-afk")
-            afk_state = True
-            afk_period_start = now
-            report_status_async("afk")
-
         current_window, current_process = get_active_window_info()
-        if current_window != prev_window or current_process != prev_process:
+        window_changed = current_window != prev_window or current_process != prev_process
+
+        net_now = psutil.net_io_counters()
+        net_diff = (net_now.bytes_sent - net_prev.bytes_sent) + (net_now.bytes_recv - net_prev.bytes_recv)
+        net_prev = net_now
+
+        idle = get_idle_seconds()
+        is_active = idle <= afk_timeout or net_diff > 0 or window_changed
+
+        if window_changed:
             log_window_period(prev_window, prev_process, window_period_start, now)
             prev_window = current_window
             prev_process = current_process
             window_period_start = now
             report_window(current_window, current_process)
+
+        if afk_state and is_active:
+            log_status_period(afk_period_start, now, "afk")
+            notafk_period_start = now
+            afk_state = False
+            report_status_async("not-afk")
+        elif not afk_state and not is_active:
+            log_status_period(notafk_period_start, now, "not-afk")
+            afk_state = True
+            afk_period_start = now
+            report_status_async("afk")
 
         time.sleep(0.5)
 

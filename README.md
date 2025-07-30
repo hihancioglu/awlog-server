@@ -1,6 +1,6 @@
 # AWLog Server
 
-Bu depo, evden çalışan kullanıcıların pencere ve AFK durumlarını takip etmek için geliştirilmiş Flask tabanlı sunucu uygulamasını içerir. `agent` klasöründeki istemci scripti, kullanıcının aktif pencere bilgilerini ve klavye/fa re etkinliklerini izleyerek bu sunucuya iletir.
+Bu depo, evden çalışan kullanıcıların pencere ve AFK durumlarını takip etmek için geliştirilmiş Flask tabanlı sunucu uygulamasını içerir. `agent` klasöründeki istemci scripti, klavye veya fare kancası kullanmadan Windows API üzerinden son kullanıcı girişi zamanını okuyarak, pencere değişimleri ve ağ trafiğiyle birlikte AFK tahmini yapıp bu bilgileri sunucuya iletir.
 
 ## Özellikler
 - **WindowLog** ve **StatusLog** modelleri ile kullanıcının aktif pencere ve AFK bilgileri kaydedilir.
@@ -59,11 +59,9 @@ ve uyarı mesajlarını yazar.
 Ayrıca `/`, `/daily_timeline`, `/weekly_report` ve `/usage_report` gibi HTML sayfaları mevcuttur.
 
 ## İstemci (Agent)
-`agent` klasörü, Windows için hazırlanmış örnek istemci uygulamasını içerir. Bu istemci; aktif pencere değişimlerini, klavye/fare etkinliklerini ve AFK durumunu tespit ederek düzenli olarak sunucuya gönderir. VPN bağlantısı `baylan.local` adresine erişilerek kontrol edilir. VPN açık olsa da API sunucusuna ulaşılamazsa arayüzde ayrı bir uyarı gösterilir.
+`agent` klasörü, Windows için hazırlanmış örnek istemci uygulamasını içerir. Bu istemci; aktif pencere değişimlerini izler, sistemdeki son giriş zamanını ve ağ trafiğini değerlendirerek AFK durumunu tahmin eder ve bu verileri düzenli olarak sunucuya gönderir. VPN bağlantısı `baylan.local` adresine erişilerek kontrol edilir. VPN açık olsa da API sunucusuna ulaşılamazsa arayüzde ayrı bir uyarı gösterilir.
 
-Ek olarak kullanıcı girişlerinin çok düzenli aralıklarla gerçekleşip gerçekleşmediği izlenir. Bu tür tutarlılık tespit edildiğinde sunucuya `macro-suspect` bildirimi gönderilerek olası makro kullanımı raporlanır.
-Varsayılan olarak 15 saniyenin altındaki düzenli girdi aralıkları analiz edilir ve 20 ardışık girişte ciddi bir tutarlılık tespit edilirse makro şüphesi raporlanır.
-Fare hareketleri de artık makro denetimine dahildir ancak gereksiz tetiklemeleri önlemek için bu hareketler en az 0.5 saniyede bir kontrol edilir.
+Ek olarak çalışmakta olan süreçler kara listeye göre taranarak bilinen makro kaydedici programlar tespit edilmeye çalışılır ve gerekirse `macro-suspect` bildirimi gönderilir.
 
 İstemci, sunucuya ulaşılamadığında log kayıtlarını geçici olarak `windowlog.txt` ve `statuslog.txt` dosyalarına yazar. Bağlantı tekrar sağlandığında bu dosyalardaki veriler otomatik olarak sunucuya iletilir ve başarılı gönderilen satırlar silinir. Bu iletim işlemleri artık asenkron HTTP çağrıları kullanılarak gerçekleşir.
 

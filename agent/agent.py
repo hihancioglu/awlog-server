@@ -15,7 +15,7 @@ import hmac
 import hashlib
 import asyncio
 from datetime import datetime, timedelta
-from pynput import mouse, keyboard
+import ctypes
 
 from debug_utils import DEBUG
 from dotenv import load_dotenv
@@ -136,26 +136,11 @@ def update_today_counters(start_time, end_time, status):
     elif status == "afk":
         today_afk_seconds += delta
 
-last_input_time = time.time()
 afk_state = False
 afk_period_start = datetime.now()
 notafk_period_start = datetime.now()
 prev_window, prev_process = None, None
 window_period_start = datetime.now()
-pressed_keys = set()
-
-# --- Makro Kullanımını Tespit İçin Girdi Zamanları ---
-input_times = []
-# Makro tespiti için gereken minimum ardışık girdi sayısı
-MACRO_CHECK_COUNT = 20
-# Ortalama aralığa göre kabul edilecek standart sapma oranı
-MACRO_STD_THRESHOLD = 0.10
-# Kontrol edilecek maksimum ortalama girdi aralığı (saniye)
-MACRO_MIN_INTERVAL = 15.0
-
-# Fare hareketlerinin makro kontrolü için minimum aralık (saniye)
-MOUSE_MACRO_INTERVAL = 0.5
-last_mouse_macro_check = 0.0
 
 # --- Makro Kaydedici Process Tespiti ---
 # Process lists are loaded from environment variables
@@ -172,23 +157,6 @@ MACRO_PROC_WHITELIST = {
 MACRO_PROC_CHECK_INTERVAL = float(os.environ.get("MACRO_PROC_CHECK_INTERVAL", "10"))
 last_macro_proc_check = 0.0
 
-# Makro kullanımını tespit etmek için son giriş zamanlarını analiz eder
-def check_macro_pattern(timestamp: float) -> None:
-    input_times.append(timestamp)
-    if len(input_times) > MACRO_CHECK_COUNT:
-        input_times.pop(0)
-    if len(input_times) < MACRO_CHECK_COUNT:
-        return
-    intervals = [input_times[i + 1] - input_times[i] for i in range(len(input_times) - 1)]
-    avg = sum(intervals) / len(intervals)
-    if avg > MACRO_MIN_INTERVAL:
-        return
-    variance = sum((x - avg) ** 2 for x in intervals) / len(intervals)
-    std_dev = variance ** 0.5
-    if avg > 0 and (std_dev / avg) < MACRO_STD_THRESHOLD:
-        DEBUG(f"Olası makro kullanımı: ort={avg:.3f}s std={std_dev:.3f}s")
-        report_status_async("macro-suspect")
-        input_times.clear()
 
 # Macro recorder process detection
 def check_macro_processes() -> None:
@@ -321,55 +289,7 @@ def log_status_period(start_time, end_time, status):
     log_queue.put(("status", data))
     update_today_counters(cur_start, end_time, status)
 
-def input_event(check_macro: bool = True):
-    """Gerçek bir kullanıcı girdisi olduğunda çağrılır.
 
-    ``check_macro`` parametresi ``False`` ise makro tespiti yapılmaz. Bu seçenek
-    sık aralıklarla tetiklenen fare hareketlerinde kullanılır.
-    """
-    global last_input_time, afk_state, afk_period_start, notafk_period_start, LOG_CALLBACK
-    now = time.time()
-    last_input_time = now
-    if check_macro:
-        check_macro_pattern(now)
-    if afk_state:
-        afk_period_end = datetime.now()
-        log_status_period(afk_period_start, afk_period_end, "afk")
-        notafk_period_start = afk_period_end
-        afk_state = False
-        report_status_async("not-afk")
-        if LOG_CALLBACK:
-            LOG_CALLBACK("Aktif")
-
-def on_key_press(key):
-    """Keyboard press handler that ignores repeated keydown events."""
-    if key not in pressed_keys:
-        pressed_keys.add(key)
-        input_event()
-
-def on_key_release(key):
-    """Keyboard release handler that always counts as activity."""
-    pressed_keys.discard(key)
-    input_event()
-
-def on_mouse_move(x, y):
-    """Handle mouse move events with throttled macro checks."""
-    global last_mouse_macro_check
-    now = time.time()
-    if now - last_mouse_macro_check >= MOUSE_MACRO_INTERVAL:
-        last_mouse_macro_check = now
-        input_event(True)
-    else:
-        input_event(False)
-
-
-def start_listeners():
-    mouse.Listener(
-        on_move=on_mouse_move,
-        on_click=lambda *a, **k: input_event(),
-        on_scroll=lambda *a, **k: input_event(),
-    ).start()
-    keyboard.Listener(on_press=on_key_press, on_release=on_key_release).start()
 
 def get_active_window_info():
     try:
@@ -384,49 +304,75 @@ def get_active_window_info():
     except Exception:
         return None, None
 
+def get_idle_seconds() -> float:
+    class LASTINPUTINFO(ctypes.Structure):
+        _fields_ = [
+            ("cbSize", ctypes.c_uint),
+            ("dwTime", ctypes.c_uint),
+        ]
+
+    info = LASTINPUTINFO()
+    info.cbSize = ctypes.sizeof(LASTINPUTINFO)
+    if ctypes.windll.user32.GetLastInputInfo(ctypes.byref(info)):
+        millis = ctypes.windll.kernel32.GetTickCount() - info.dwTime
+        return millis / 1000.0
+    return 0.0
+
+
 def logging_thread_func(running_flag, log_callback=None):
-    global afk_state, afk_period_start, notafk_period_start, prev_window, prev_process, window_period_start, last_input_time, LOG_CALLBACK
+    global afk_state, afk_period_start, notafk_period_start, prev_window, prev_process, window_period_start, LOG_CALLBACK
     LOG_CALLBACK = log_callback
-    start_listeners()
     prev_window, prev_process = get_active_window_info()
     window_period_start = datetime.now()
     notafk_period_start = window_period_start
     report_window(prev_window, prev_process)
     last_check = datetime.now()
+    net_prev = psutil.net_io_counters()
 
     while running_flag.is_set():
         now = datetime.now()
         check_macro_processes()
 
         if (now - last_check).total_seconds() > afk_timeout * 2:
-            # System likely resumed from sleep; avoid logging a huge not-afk period
             if not afk_state:
                 log_status_period(notafk_period_start, last_check, "not-afk")
             afk_state = True
             afk_period_start = now
             notafk_period_start = now
-            last_input_time = time.time()
         last_check = now
 
-        # AFK kontrol
-        if not afk_state and (time.time() - last_input_time) > afk_timeout:
-            # not-afk dönemi bitti, logla
-            log_status_period(notafk_period_start, now, "not-afk")
-            afk_state = True
-            afk_period_start = now
-            if log_callback:
-                log_callback("AFK oldu")
-            if not report_status("afk"):
-                DEBUG("report_status afk failed")
-
-        # Pencere değişimi kontrolü
         current_window, current_process = get_active_window_info()
-        if current_window != prev_window or current_process != prev_process:
+        window_changed = current_window != prev_window or current_process != prev_process
+
+        net_now = psutil.net_io_counters()
+        net_diff = (net_now.bytes_sent - net_prev.bytes_sent) + (net_now.bytes_recv - net_prev.bytes_recv)
+        net_prev = net_now
+
+        idle = get_idle_seconds()
+        is_active = idle <= afk_timeout or net_diff > 0 or window_changed
+
+        if window_changed:
             log_window_period(prev_window, prev_process, window_period_start, now)
             prev_window = current_window
             prev_process = current_process
             window_period_start = now
             report_window(current_window, current_process)
+
+        if afk_state and is_active:
+            log_status_period(afk_period_start, now, "afk")
+            notafk_period_start = now
+            afk_state = False
+            report_status_async("not-afk")
+            if LOG_CALLBACK:
+                LOG_CALLBACK("Aktif")
+        elif not afk_state and not is_active:
+            log_status_period(notafk_period_start, now, "not-afk")
+            afk_state = True
+            afk_period_start = now
+            if LOG_CALLBACK:
+                LOG_CALLBACK("AFK oldu")
+            if not report_status("afk"):
+                DEBUG("report_status afk failed")
 
         time.sleep(0.5)
 
@@ -676,11 +622,10 @@ class MainWindow(QWidget):
                 today_afk_seconds = int(data.get("afk", 0))
                 # Reset the current not-afk period start so the label does not
                 # add extra seconds before logging thread initializes.
-                global notafk_period_start, afk_period_start, last_input_time
+                global notafk_period_start, afk_period_start
                 now = datetime.now()
                 notafk_period_start = now
                 afk_period_start = now
-                last_input_time = time.time()
                 self.update_time_labels()
         except Exception:
             pass
