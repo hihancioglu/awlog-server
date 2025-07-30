@@ -314,12 +314,19 @@ def simplify_window_title(title: str) -> str:
     return domain if domain else title
 
 
+_BROWSER_URL_CACHE: dict[int, tuple[str, float]] = {}
+
 def get_browser_url(pid: int) -> str | None:
     """Return URL from browser's address bar using UI Automation."""
     try:
         import pywinauto
     except Exception:
         return None
+
+    now = time.time()
+    cached = _BROWSER_URL_CACHE.get(pid)
+    if cached and now - cached[1] < 3.0:
+        return cached[0]
 
     try:
         app = pywinauto.Application(backend="uia").connect(process=pid)
@@ -328,9 +335,11 @@ def get_browser_url(pid: int) -> str | None:
             try:
                 val = el.get_value()
                 if isinstance(val, str) and val.startswith("http"):
+                    _BROWSER_URL_CACHE[pid] = (val, now)
                     return val
                 txt = el.window_text()
                 if isinstance(txt, str) and txt.startswith("http"):
+                    _BROWSER_URL_CACHE[pid] = (txt, now)
                     return txt
             except Exception:
                 continue
