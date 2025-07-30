@@ -62,6 +62,7 @@ Ayrıca `/`, `/daily_timeline`, `/weekly_report` ve `/usage_report` gibi HTML sa
 ## İstemci (Agent)
 `agent` klasörü, Windows için hazırlanmış örnek istemci uygulamasını içerir. Bu istemci; aktif pencere değişimlerini izler, sistemdeki son giriş zamanını ve ağ trafiğini değerlendirerek AFK durumunu tahmin eder ve bu verileri düzenli olarak sunucuya gönderir. Windows kilitlenirse AFK durumu anında bildirilir. VPN bağlantısı `baylan.local` adresine erişilerek kontrol edilir. VPN açık olsa da API sunucusuna ulaşılamazsa arayüzde ayrı bir uyarı gösterilir.
 
+AFK tespiti icin istemci, varsayilan olarak 60 saniyelik `afk_timeout` ve 1024 baytlik `net_active_threshold` degerlerini kullanir. Kucuk ama surekli ag trafiginin yanlis sonuclara yol acmamasi icin son `net_active_window` suresinde (varsayilan 5 saniye) biriken baytlarin toplami bu esigi asmadikca AFK durumuna gecilmez. Bu parametreleri `agent/agent.py` dosyasindaki sabitlerden dilediginiz gibi ayarlayabilirsiniz.
 Ek olarak çalışmakta olan süreçler kara listeye göre taranarak bilinen makro kaydedici programlar tespit edilmeye çalışılır ve gerekirse `macro-suspect` bildirimi gönderilir.
 Makro kara listesi ve tarama aralığı artık istemcinin `.env` dosyasında tutulmaz; bu ayarlar sunucu tarafındaki ortam değişkenlerinden okunur ve istemci başlangıçta `/agent/config` uç noktasından çekilir.
 
