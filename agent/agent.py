@@ -402,6 +402,15 @@ def get_active_window_info():
     except Exception as e:
         DEBUG(f"get_active_window_info process error: {e}")
 
+    # Hemen elde edebiliyorsak URL'i senkron olarak oku
+    if not window_title and process_name:
+        try:
+            url = get_browser_url(pid)
+            if url:
+                window_title = url
+        except Exception as e:
+            DEBUG(f"get_active_window_info url sync error: {e}")
+
     url_updated = False
     try:
         if process_name:

@@ -152,6 +152,7 @@ def report_status_async(status):
 
 
 async def _report_window(window_title, process_name):
+    window_title = simplify_window_title(window_title)
     data = {
         "username": get_username(),
         "hostname": get_hostname(),
@@ -212,6 +213,7 @@ def check_macro_processes() -> None:
 
 
 def log_window_period(window_title, process_name, start_time, end_time):
+    window_title = simplify_window_title(window_title)
     duration = int((end_time - start_time).total_seconds())
     data = {
         "window_title": window_title or "",
@@ -241,6 +243,23 @@ def extract_domain(title: str) -> str | None:
     if m:
         return m.group(1).lower()
     return None
+
+
+def simplify_window_title(title: str) -> str:
+    """Return just the domain for URLs in window titles."""
+    if not title:
+        return ""
+    if title.startswith("http://") or title.startswith("https://"):
+        try:
+            from urllib.parse import urlparse
+
+            parsed = urlparse(title)
+            if parsed.hostname:
+                return parsed.hostname.lower()
+        except Exception:
+            pass
+    domain = extract_domain(title)
+    return domain if domain else title
 
 
 def get_browser_url(pid: int) -> str | None:
@@ -316,6 +335,14 @@ def get_active_window_info():
         process_name = process.name()
     except Exception as e:
         DEBUG(f"get_active_window_info process error: {e}")
+
+    if not window_title and process_name:
+        try:
+            url = get_browser_url(pid)
+            if url:
+                window_title = url
+        except Exception as e:
+            DEBUG(f"get_active_window_info url sync error: {e}")
 
     url_updated = False
     try:
