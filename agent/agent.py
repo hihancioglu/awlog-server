@@ -18,6 +18,9 @@ from datetime import datetime, timedelta
 from pynput import mouse, keyboard
 
 from debug_utils import DEBUG
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Callback that will be invoked whenever the agent successfully contacts the
 # server. ``MainWindow`` sets this to update the UI.
@@ -154,6 +157,21 @@ MACRO_MIN_INTERVAL = 15.0
 MOUSE_MACRO_INTERVAL = 0.5
 last_mouse_macro_check = 0.0
 
+# --- Makro Kaydedici Process Tespiti ---
+# Process lists are loaded from environment variables
+MACRO_PROC_BLACKLIST = {
+    p.strip().lower()
+    for p in os.environ.get("MACRO_PROC_BLACKLIST", "").split(",")
+    if p.strip()
+}
+MACRO_PROC_WHITELIST = {
+    p.strip().lower()
+    for p in os.environ.get("MACRO_PROC_WHITELIST", "").split(",")
+    if p.strip()
+}
+MACRO_PROC_CHECK_INTERVAL = float(os.environ.get("MACRO_PROC_CHECK_INTERVAL", "10"))
+last_macro_proc_check = 0.0
+
 # Makro kullanımını tespit etmek için son giriş zamanlarını analiz eder
 def check_macro_pattern(timestamp: float) -> None:
     input_times.append(timestamp)
@@ -171,6 +189,31 @@ def check_macro_pattern(timestamp: float) -> None:
         DEBUG(f"Olası makro kullanımı: ort={avg:.3f}s std={std_dev:.3f}s")
         report_status_async("macro-suspect")
         input_times.clear()
+
+# Macro recorder process detection
+def check_macro_processes() -> None:
+    """Scan running processes against blacklist and log if found."""
+    global last_macro_proc_check
+    now = time.time()
+    if now - last_macro_proc_check < MACRO_PROC_CHECK_INTERVAL:
+        return
+    last_macro_proc_check = now
+    suspects = []
+    blacklist = {p.lower() for p in MACRO_PROC_BLACKLIST}
+    whitelist = {p.lower() for p in MACRO_PROC_WHITELIST}
+    for proc in psutil.process_iter(["name"]):
+        try:
+            name = (proc.info.get("name") or "").lower()
+            if name in blacklist and name not in whitelist:
+                suspects.append(name)
+        except Exception:
+            continue
+    if suspects:
+        msg = f"Makro programı tespit edildi: {', '.join(sorted(set(suspects)))}"
+        if LOG_CALLBACK:
+            LOG_CALLBACK(msg)
+        else:
+            DEBUG(msg)
 
 def get_hostname():
     return socket.gethostname()
@@ -353,6 +396,7 @@ def logging_thread_func(running_flag, log_callback=None):
 
     while running_flag.is_set():
         now = datetime.now()
+        check_macro_processes()
 
         if (now - last_check).total_seconds() > afk_timeout * 2:
             # System likely resumed from sleep; avoid logging a huge not-afk period

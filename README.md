@@ -40,6 +40,12 @@ ve uyarı mesajlarını yazar.
   sayısı (varsayılan 30).
 - `LOG_DIR` – Sunucu günlüklerinin yazılacağı klasör (varsayılan `logs`).
 - `DEBUG` – `1` veya `true` ise ek hata ayıklama mesajları loglanır.
+- `MACRO_PROC_BLACKLIST` – Makro kaydedici olarak kabul edilen işlem
+  isimlerinin virgülle ayrılmış listesi.
+- `MACRO_PROC_WHITELIST` – Tespit edilse de yoksayılacak işlem
+  isimlerinin virgülle ayrılmış listesi.
+- `MACRO_PROC_CHECK_INTERVAL` – Süreç listesinin kaç saniyede bir
+  taranacağı (varsayılan 10).
 
 ## API Uç Noktaları
 - `POST /register` – İstemciye benzersiz bir gizli anahtar döner.
