@@ -1,6 +1,7 @@
 import sys
 import os
 import psutil
+import re
 import requests
 import subprocess
 import getpass
@@ -285,6 +286,15 @@ def log_status_period(start_time, end_time, status):
     update_today_counters(cur_start, end_time, status)
 
 
+def extract_domain(title: str) -> str | None:
+    """Return domain part from a window title, if any."""
+    if not title:
+        return None
+    m = re.search(r"([A-Za-z0-9.-]+\.[A-Za-z]{2,})", title)
+    if m:
+        return m.group(1).lower()
+    return None
+
 
 def get_active_window_info():
     try:
@@ -295,6 +305,12 @@ def get_active_window_info():
         _, pid = win32process.GetWindowThreadProcessId(hwnd)
         process = psutil.Process(pid)
         process_name = process.name()
+        proc_lower = process_name.lower()
+        browsers = {"chrome.exe", "msedge.exe", "firefox.exe", "opera.exe", "iexplore.exe"}
+        if proc_lower in browsers:
+            domain = extract_domain(window_title)
+            if domain:
+                window_title = domain
         return window_title, process_name
     except Exception:
         return None, None

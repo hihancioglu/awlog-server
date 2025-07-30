@@ -4,6 +4,7 @@ Bu depo, evden çalışan kullanıcıların pencere ve AFK durumlarını takip e
 
 ## Özellikler
 - **WindowLog** ve **StatusLog** modelleri ile kullanıcının aktif pencere ve AFK bilgileri kaydedilir.
+- Tarayıcı pencereleri için URL bilgisinden yalnızca alan adı kaydedilir.
 - En son bildirimlere göre çevrimiçi/çevrimdışı durumunu takip eder.
 - Günlük zaman çizelgesi, haftalık rapor ve kullanım raporu gibi çeşitli HTML panelleri sağlar.
 - REST API uç noktaları aracılığıyla log kayıtlarını kabul eder ve rapor verilerini döndürür.
