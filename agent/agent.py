@@ -154,6 +154,7 @@ browser_url = None
 browser_thread = None
 browser_lock = threading.Lock()
 last_was_browser = False
+browser_url_new = False
 
 # --- Makro Kaydedici Process Tespiti ---
 # Lists will be fetched from the server at startup
@@ -353,19 +354,21 @@ def _browser_url_worker(pid: int):
     url = get_browser_url(pid)
     with browser_lock:
         if pid == browser_pid:
-            global browser_url
+            global browser_url, browser_url_new
             browser_url = url
+            browser_url_new = True
 
 
 def schedule_browser_url_read(pid: int, hwnd: int) -> None:
     """Start background URL read if process/window changed."""
-    global browser_pid, browser_hwnd, browser_thread, browser_url, last_was_browser
+    global browser_pid, browser_hwnd, browser_thread, browser_url, browser_url_new, last_was_browser
     with browser_lock:
         if pid == browser_pid and hwnd == browser_hwnd and last_was_browser:
             return
         browser_pid = pid
         browser_hwnd = hwnd
         browser_url = None
+        browser_url_new = False
         if browser_thread and browser_thread.is_alive():
             return
         browser_thread = threading.Thread(target=_browser_url_worker, args=(pid,), daemon=True)
@@ -384,12 +387,18 @@ def get_active_window_info():
         process_name = process.name()
         proc_lower = process_name.lower()
         browsers = {"chrome.exe", "msedge.exe", "firefox.exe", "opera.exe", "iexplore.exe"}
+        url_updated = False
         if proc_lower in browsers:
             schedule_browser_url_read(pid, hwnd)
             with browser_lock:
                 url = browser_url
+                new = browser_url_new
+                if new:
+                    browser_url_new = False
             if url:
                 window_title = url
+                if new:
+                    url_updated = True
             else:
                 domain = extract_domain(window_title)
                 if domain:
@@ -398,9 +407,9 @@ def get_active_window_info():
         else:
             last_was_browser = False
         window_title = simplify_window_title(window_title)
-        return window_title, process_name
+        return window_title, process_name, url_updated
     except Exception:
-        return None, None
+        return None, None, False
 
 def get_idle_seconds() -> float:
     class LASTINPUTINFO(ctypes.Structure):
@@ -434,7 +443,7 @@ def is_workstation_locked() -> bool:
 def logging_thread_func(running_flag, log_callback=None):
     global afk_state, afk_period_start, notafk_period_start, prev_window, prev_process, window_period_start, LOG_CALLBACK
     LOG_CALLBACK = log_callback
-    prev_window, prev_process = get_active_window_info()
+    prev_window, prev_process, _ = get_active_window_info()
     window_period_start = datetime.now()
     notafk_period_start = window_period_start
     report_window(prev_window, prev_process)
@@ -455,8 +464,11 @@ def logging_thread_func(running_flag, log_callback=None):
             notafk_period_start = now
         last_check = now
 
-        current_window, current_process = get_active_window_info()
+        current_window, current_process, url_updated = get_active_window_info()
         window_changed = current_window != prev_window or current_process != prev_process
+        if url_updated and not window_changed:
+            prev_window = current_window
+            report_window(current_window, current_process)
 
         net_now = psutil.net_io_counters()
         net_diff = (
