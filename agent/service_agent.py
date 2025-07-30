@@ -265,6 +265,20 @@ def get_idle_seconds() -> float:
     return 0.0
 
 
+def is_workstation_locked() -> bool:
+    """Return ``True`` if the workstation is locked."""
+    try:
+        user32 = ctypes.windll.user32
+        hDesktop = user32.OpenInputDesktop(0, False, 0x0100)
+        if not hDesktop:
+            return True
+        locked = not user32.SwitchDesktop(hDesktop)
+        user32.CloseDesktop(hDesktop)
+        return locked
+    except Exception:
+        return False
+
+
 def logging_thread_func(running_flag):
     global afk_state, afk_period_start, notafk_period_start, prev_window, prev_process, window_period_start
     prev_window, prev_process = get_active_window_info()
@@ -293,7 +307,8 @@ def logging_thread_func(running_flag):
         net_prev = net_now
 
         idle = get_idle_seconds()
-        is_active = idle <= afk_timeout or net_diff > 0 or window_changed
+        locked = is_workstation_locked()
+        is_active = (not locked) and (idle <= afk_timeout or net_diff > 0 or window_changed)
 
         if window_changed:
             log_window_period(prev_window, prev_process, window_period_start, now)
