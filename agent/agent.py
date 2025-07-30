@@ -296,6 +296,31 @@ def extract_domain(title: str) -> str | None:
     return None
 
 
+def get_browser_url(pid: int) -> str | None:
+    """Return URL from browser's address bar using UI Automation."""
+    try:
+        import pywinauto
+    except Exception:
+        return None
+
+    try:
+        app = pywinauto.Application(backend="uia").connect(process=pid)
+        dlg = app.top_window()
+        for el in dlg.descendants(control_type="Edit"):
+            try:
+                val = el.get_value()
+                if isinstance(val, str) and val.startswith("http"):
+                    return val
+                txt = el.window_text()
+                if isinstance(txt, str) and txt.startswith("http"):
+                    return txt
+            except Exception:
+                continue
+    except Exception:
+        return None
+    return None
+
+
 def get_active_window_info():
     try:
         import win32gui
@@ -308,9 +333,13 @@ def get_active_window_info():
         proc_lower = process_name.lower()
         browsers = {"chrome.exe", "msedge.exe", "firefox.exe", "opera.exe", "iexplore.exe"}
         if proc_lower in browsers:
-            domain = extract_domain(window_title)
-            if domain:
-                window_title = domain
+            url = get_browser_url(pid)
+            if url:
+                window_title = url
+            else:
+                domain = extract_domain(window_title)
+                if domain:
+                    window_title = domain
         return window_title, process_name
     except Exception:
         return None, None
