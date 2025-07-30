@@ -92,6 +92,10 @@ AGENT_SECRET = None
 afk_timeout = 60  # saniye (AFK için 1dk uygundur)
 # Ağ trafiğinin aktif sayılması için gereken minimum byte miktarı
 net_active_threshold = 1024  # 1 KB
+# Ağ trafiğini daha stabil ölçmek için son birkaç saniyelik toplam
+# bayt miktarı değerlendirilir. Böylece küçük dalgalanmalar sürekli
+# "Aktif"/"AFK" geçişine neden olmaz.
+net_active_window = 5  # saniye
 log_queue = queue.Queue()
 LOG_PATH = os.path.join(tempfile.gettempdir(), "windowlog.txt")
 STATUSLOG_PATH = os.path.join(tempfile.gettempdir(), "statuslog.txt")
@@ -333,6 +337,8 @@ def logging_thread_func(running_flag, log_callback=None):
     report_window(prev_window, prev_process)
     last_check = datetime.now()
     net_prev = psutil.net_io_counters()
+    # Geçmiş ağ trafiği verilerini tutmak için (zaman, byte) çiftleri
+    net_history = []
 
     while running_flag.is_set():
         now = datetime.now()
@@ -357,13 +363,24 @@ def logging_thread_func(running_flag, log_callback=None):
         )
         net_prev = net_now
 
+        # Son "net_active_window" süresinde biriken toplam byte miktarını
+        # hesapla. Böylece çok kısa süreli düşük trafik yanlış AFK
+        # tespitine yol açmaz.
+        net_history.append((now, net_diff))
+        net_history = [
+            (t, b)
+            for (t, b) in net_history
+            if (now - t).total_seconds() <= net_active_window
+        ]
+        net_total = sum(b for _, b in net_history)
+
         idle = get_idle_seconds()
         locked = is_workstation_locked()
         is_active = (
             not locked
             and (
                 idle <= afk_timeout
-                or net_diff > net_active_threshold
+                or net_total > net_active_threshold
                 or window_changed
             )
         )
