@@ -146,6 +146,15 @@ notafk_period_start = datetime.now()
 prev_window, prev_process = None, None
 window_period_start = datetime.now()
 
+# --- Browser URL fetching state ---
+# Last active browser PID and window handle to avoid expensive URL reads
+browser_pid = None
+browser_hwnd = None
+browser_url = None
+browser_thread = None
+browser_lock = threading.Lock()
+last_was_browser = False
+
 # --- Makro Kaydedici Process Tespiti ---
 # Lists will be fetched from the server at startup
 MACRO_PROC_BLACKLIST = set()
@@ -339,7 +348,32 @@ def get_browser_url(pid: int) -> str | None:
     return None
 
 
+def _browser_url_worker(pid: int):
+    """Background worker to read browser URL and store globally."""
+    url = get_browser_url(pid)
+    with browser_lock:
+        if pid == browser_pid:
+            global browser_url
+            browser_url = url
+
+
+def schedule_browser_url_read(pid: int, hwnd: int) -> None:
+    """Start background URL read if process/window changed."""
+    global browser_pid, browser_hwnd, browser_thread, browser_url, last_was_browser
+    with browser_lock:
+        if pid == browser_pid and hwnd == browser_hwnd and last_was_browser:
+            return
+        browser_pid = pid
+        browser_hwnd = hwnd
+        browser_url = None
+        if browser_thread and browser_thread.is_alive():
+            return
+        browser_thread = threading.Thread(target=_browser_url_worker, args=(pid,), daemon=True)
+        browser_thread.start()
+
+
 def get_active_window_info():
+    global last_was_browser
     try:
         import win32gui
         import win32process
@@ -351,13 +385,18 @@ def get_active_window_info():
         proc_lower = process_name.lower()
         browsers = {"chrome.exe", "msedge.exe", "firefox.exe", "opera.exe", "iexplore.exe"}
         if proc_lower in browsers:
-            url = get_browser_url(pid)
+            schedule_browser_url_read(pid, hwnd)
+            with browser_lock:
+                url = browser_url
             if url:
                 window_title = url
             else:
                 domain = extract_domain(window_title)
                 if domain:
                     window_title = domain
+            last_was_browser = True
+        else:
+            last_was_browser = False
         window_title = simplify_window_title(window_title)
         return window_title, process_name
     except Exception:
