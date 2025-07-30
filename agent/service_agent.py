@@ -179,6 +179,10 @@ MACRO_CHECK_COUNT = 10
 MACRO_STD_THRESHOLD = 0.05
 MACRO_MIN_INTERVAL = 30.0
 
+# Fare hareketlerinin makro kontrolü için minimum aralık (saniye)
+MOUSE_MACRO_INTERVAL = 0.5
+last_mouse_macro_check = 0.0
+
 def check_macro_pattern(ts: float) -> None:
     input_times.append(ts)
     if len(input_times) > MACRO_CHECK_COUNT:
@@ -244,9 +248,20 @@ def on_key_release(key):
     input_event()
 
 
+def on_mouse_move(x, y):
+    """Handle mouse move events with throttled macro checks."""
+    global last_mouse_macro_check
+    now = time.time()
+    if now - last_mouse_macro_check >= MOUSE_MACRO_INTERVAL:
+        last_mouse_macro_check = now
+        input_event(True)
+    else:
+        input_event(False)
+
+
 def start_listeners():
     mouse.Listener(
-        on_move=lambda *a, **k: input_event(False),
+        on_move=on_mouse_move,
         on_click=lambda *a, **k: input_event(),
         on_scroll=lambda *a, **k: input_event(),
     ).start()
