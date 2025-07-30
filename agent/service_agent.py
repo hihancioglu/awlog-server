@@ -295,39 +295,56 @@ def schedule_browser_url_read(pid: int, hwnd: int) -> None:
 
 
 def get_active_window_info():
+    """Return active window title and process name for the current session."""
+
     global last_was_browser
+
     try:
         import win32gui
         import win32process
-        hwnd = win32gui.GetForegroundWindow()
-        window_title = win32gui.GetWindowText(hwnd)
+    except Exception as e:
+        DEBUG(f"get_active_window_info import error: {e}")
+        return None, None, False
+
+    hwnd = win32gui.GetForegroundWindow()
+    window_title = win32gui.GetWindowText(hwnd)
+
+    process_name = None
+    try:
         _, pid = win32process.GetWindowThreadProcessId(hwnd)
         process = psutil.Process(pid)
         process_name = process.name()
-        proc_lower = process_name.lower()
-        browsers = {"chrome.exe", "msedge.exe", "firefox.exe", "opera.exe", "iexplore.exe"}
-        url_updated = False
-        if proc_lower in browsers:
-            schedule_browser_url_read(pid, hwnd)
-            with browser_lock:
-                url = browser_url
-                new = browser_url_new
-                if new:
-                    browser_url_new = False
-            if url:
-                window_title = url
-                if new:
-                    url_updated = True
+    except Exception as e:
+        DEBUG(f"get_active_window_info process error: {e}")
+
+    url_updated = False
+    try:
+        if process_name:
+            proc_lower = process_name.lower()
+            browsers = {"chrome.exe", "msedge.exe", "firefox.exe", "opera.exe", "iexplore.exe"}
+            if proc_lower in browsers:
+                schedule_browser_url_read(pid, hwnd)
+                with browser_lock:
+                    url = browser_url
+                    new = browser_url_new
+                    if new:
+                        browser_url_new = False
+                if url:
+                    window_title = url
+                    if new:
+                        url_updated = True
+                else:
+                    domain = extract_domain(window_title)
+                    if domain:
+                        window_title = domain
+                last_was_browser = True
             else:
-                domain = extract_domain(window_title)
-                if domain:
-                    window_title = domain
-            last_was_browser = True
-        else:
-            last_was_browser = False
-        return window_title, process_name, url_updated
-    except Exception:
-        return None, None, False
+                last_was_browser = False
+    except Exception as e:
+        DEBUG(f"get_active_window_info browser error: {e}")
+        last_was_browser = False
+
+    return window_title, process_name, url_updated
 
 
 def get_idle_seconds() -> float:
