@@ -35,6 +35,10 @@ from PyQt5.QtCore import pyqtSignal, pyqtSlot, QTimer
 
 # Agent uygulamasının sürüm bilgisi
 AGENT_VERSION = "1.0.0"
+# Güncelleme kontrolü için JSON dosyasının bulunduğu URL
+UPDATE_JSON_URL = "https://evden.baylan.info.tr/agent_version.json"
+# İndirilecek güncelleme dosyasının geçici kaydedileceği yol
+UPDATER_TEMP_PATH = os.path.join(tempfile.gettempdir(), "updater.exe")
 
 # --- TEK INSTANCE GARANTİ: PID kontrollü LOCK FILE ---
 LOCKFILE = os.path.join(tempfile.gettempdir(), "evden_calisma.lock")
@@ -81,6 +85,43 @@ def is_forticlient_running():
                 return True
         except Exception: pass
     return False
+
+# ---- Güncelleme Kontrolü ----
+def _parse_version(ver: str):
+    return tuple(int(x) for x in re.findall(r"\d+", ver))
+
+
+def check_for_update():
+    try:
+        r = requests.get(UPDATE_JSON_URL, timeout=5)
+        if r.status_code != 200:
+            return
+        info = r.json()
+        remote_ver = info.get("version")
+        download_url = info.get("url")
+        expected_hash = (info.get("hash") or "").lower()
+        if not remote_ver or not download_url:
+            return
+        if _parse_version(remote_ver) <= _parse_version(AGENT_VERSION):
+            return
+        resp = requests.get(download_url, stream=True, timeout=10)
+        if resp.status_code != 200:
+            return
+        with open(UPDATER_TEMP_PATH, "wb") as f:
+            for chunk in resp.iter_content(chunk_size=8192):
+                if chunk:
+                    f.write(chunk)
+        sha256 = hashlib.sha256()
+        with open(UPDATER_TEMP_PATH, "rb") as f:
+            for chunk in iter(lambda: f.read(8192), b""):
+                sha256.update(chunk)
+        if expected_hash and sha256.hexdigest().lower() != expected_hash:
+            os.remove(UPDATER_TEMP_PATH)
+            return
+        subprocess.Popen([UPDATER_TEMP_PATH], shell=False)
+        sys.exit(0)
+    except Exception as e:
+        DEBUG(f"check_for_update failed: {e}")
 
 # Ana sunucu adresi. API çağrıları için base URL olarak kullanılır
 SERVER_URL = "http://baylan-portainer:5050"
@@ -994,6 +1035,7 @@ class MainWindow(QWidget):
         event.accept()
 
 if __name__ == "__main__":
+    check_for_update()
     app = QApplication(sys.argv)
     win = MainWindow()
     win.show()
