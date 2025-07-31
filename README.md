@@ -4,9 +4,8 @@ Bu depo, evden çalışan kullanıcıların pencere ve AFK durumlarını takip e
 
 ## Özellikler
 - **WindowLog** ve **StatusLog** modelleri ile kullanıcının aktif pencere ve AFK bilgileri kaydedilir.
-- Tarayıcı pencereleri için URL bilgisinden yalnızca alan adı kaydedilir.
-  URL algılama mekanizması geliştirilerek Chrome ve Edge için gecikmeler
-  azaltılmıştır.
+- Tarayıcı pencereleri de dahil olmak üzere pencere başlıkları doğrudan
+  kaydedilir.
 - En son bildirimlere göre çevrimiçi/çevrimdışı durumunu takip eder.
 - Günlük zaman çizelgesi, haftalık rapor ve kullanım raporu gibi çeşitli HTML panelleri sağlar.
 - REST API uç noktaları aracılığıyla log kayıtlarını kabul eder ve rapor verilerini döndürür.
@@ -63,7 +62,7 @@ ve uyarı mesajlarını yazar.
 Ayrıca `/`, `/daily_timeline`, `/weekly_report` ve `/usage_report` gibi HTML sayfaları mevcuttur.
 
 ## İstemci (Agent)
-`agent` klasörü, Windows için hazırlanmış örnek istemci uygulamasını içerir. Bu istemci; aktif pencere değişimlerini izler, sistemdeki son giriş zamanını ve ağ trafiğini değerlendirerek AFK durumunu tahmin eder ve bu verileri düzenli olarak sunucuya gönderir. Tarayıcı pencerelerindeki URL'leri okuyabilmek için `pywinauto` kütüphanesini kullanır. Windows kilitlenirse AFK durumu anında bildirilir. VPN bağlantısı `baylan.local` adresine erişilerek kontrol edilir. VPN açık olsa da API sunucusuna ulaşılamazsa arayüzde ayrı bir uyarı gösterilir.
+`agent` klasörü, Windows için hazırlanmış örnek istemci uygulamasını içerir. Bu istemci; aktif pencere değişimlerini izler, sistemdeki son giriş zamanını ve ağ trafiğini değerlendirerek AFK durumunu tahmin eder ve bu verileri düzenli olarak sunucuya gönderir. Windows kilitlenirse AFK durumu anında bildirilir. VPN bağlantısı `baylan.local` adresine erişilerek kontrol edilir. VPN açık olsa da API sunucusuna ulaşılamazsa arayüzde ayrı bir uyarı gösterilir.
 
 AFK tespiti icin istemci, varsayilan olarak 60 saniyelik `afk_timeout` ve 1 MB (1.048.576 bayt) `net_active_threshold` degerlerini kullanir. Kucuk ama surekli ag trafiginin yanlis sonuclara yol acmamasi icin son `net_active_window` suresinde (varsayilan 5 saniye) biriken baytlarin toplami bu esigi asmadikca AFK durumuna gecilmez. Bu parametreleri `agent/agent.py` dosyasindaki sabitlerden dilediginiz gibi ayarlayabilirsiniz.
 Ek olarak çalışmakta olan süreçler kara listeye göre taranarak bilinen makro kaydedici programlar tespit edilmeye çalışılır ve gerekirse `macro-suspect` bildirimi gönderilir.

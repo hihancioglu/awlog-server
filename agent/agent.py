@@ -290,7 +290,6 @@ def send_log_to_server(log_type, data):
     return asyncio.run(_send_log_to_server(log_type, data))
 
 def log_window_period(window_title, process_name, start_time, end_time):
-    window_title = simplify_window_title(window_title)
     duration = int((end_time - start_time).total_seconds())
     data = {
         "window_title": window_title or "",
@@ -328,74 +327,6 @@ def log_status_period(start_time, end_time, status):
     update_today_counters(cur_start, end_time, status)
 
 
-def extract_domain(title: str) -> str | None:
-    """Return domain part from a window title, if any."""
-    if not title:
-        return None
-    m = re.search(r"([A-Za-z0-9.-]+\.[A-Za-z]{2,})", title)
-    if m:
-        return m.group(1).lower()
-    return None
-
-
-def simplify_window_title(title: str) -> str:
-    """Return just the domain for URLs in window titles."""
-    if not title:
-        return ""
-    if title.startswith("http://") or title.startswith("https://"):
-        try:
-            from urllib.parse import urlparse
-
-            parsed = urlparse(title)
-            if parsed.hostname:
-                return parsed.hostname.lower()
-        except Exception:
-            pass
-    domain = extract_domain(title)
-    return domain if domain else title
-
-
-_BROWSER_URL_CACHE: dict[tuple[int, int], tuple[str, float]] = {}
-
-def get_browser_url(pid: int, hwnd: int | None = None) -> str | None:
-    """Return URL from browser's address bar using UI Automation.
-
-    ``hwnd`` is used to connect directly to the active window to improve
-    reliability with multi-process browsers like Chrome/Edge.
-    """
-    try:
-        import pywinauto
-    except Exception:
-        return None
-
-    now = time.time()
-    key = (pid, hwnd or 0)
-    cached = _BROWSER_URL_CACHE.get(key)
-    if cached and now - cached[1] < 1.0:
-        return cached[0]
-
-    try:
-        if hwnd:
-            app = pywinauto.Application(backend="uia").connect(handle=hwnd)
-            dlg = app.window(handle=hwnd)
-        else:
-            app = pywinauto.Application(backend="uia").connect(process=pid)
-            dlg = app.top_window()
-        for el in dlg.descendants(control_type="Edit"):
-            try:
-                val = el.get_value()
-                if isinstance(val, str) and val.startswith("http"):
-                    _BROWSER_URL_CACHE[key] = (val, now)
-                    return val
-                txt = el.window_text()
-                if isinstance(txt, str) and txt.startswith("http"):
-                    _BROWSER_URL_CACHE[key] = (txt, now)
-                    return txt
-            except Exception:
-                continue
-    except Exception:
-        return None
-    return None
 
 
 def get_active_window_info():
@@ -407,17 +338,6 @@ def get_active_window_info():
         _, pid = win32process.GetWindowThreadProcessId(hwnd)
         process = psutil.Process(pid)
         process_name = process.name()
-        proc_lower = process_name.lower()
-        browsers = {"chrome.exe", "msedge.exe", "firefox.exe", "opera.exe", "iexplore.exe"}
-        if proc_lower in browsers:
-            url = get_browser_url(pid, hwnd)
-            if url:
-                window_title = url
-            else:
-                domain = extract_domain(window_title)
-                if domain:
-                    window_title = domain
-        window_title = simplify_window_title(window_title)
         return window_title, process_name
     except Exception:
         return None, None
@@ -594,7 +514,6 @@ def report_status_async(status):
 
 async def _report_window(window_title, process_name):
     """Asynchronously send current window information to the server."""
-    window_title = simplify_window_title(window_title)
     data = {
         "username": getpass.getuser(),
         "hostname": socket.gethostname(),
