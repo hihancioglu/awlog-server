@@ -169,6 +169,8 @@ def check_for_update(auto_exit=True, log_callback=None):
         ])
         if auto_exit:
             os._exit(0)
+        else:
+            self.logla("G\u00fcncelleme bulunamad\u0131.")
         return True
     except Exception as e:
         DEBUG(f"check_for_update failed: {e}")
@@ -775,6 +777,8 @@ class MainWindow(QWidget):
         if updated:
             self.logla("G\u00fcncelleme bulundu, uygulama kapat\u0131l\u0131yor...")
             os._exit(0)
+        else:
+            self.logla("G\u00fcncelleme bulunamad\u0131.")
         self.logla("G\u00fcncelleme kontrol\u00fc tamamland\u0131.")
         self.basla_btn.setEnabled(True)
 
