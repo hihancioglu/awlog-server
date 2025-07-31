@@ -12,6 +12,7 @@ class WindowLog(db.Model):
     username = db.Column(db.String(128))
     window_title = db.Column(db.String(512))
     process_name = db.Column(db.String(128))
+    url = db.Column(db.String(2048))
     start_time = db.Column(db.String(32))
     end_time = db.Column(db.String(32))
     duration = db.Column(db.Integer)
@@ -35,6 +36,7 @@ class ReportLog(db.Model):
     status = db.Column(db.String(32))  # online/offline/keepalive/afk/not-afk
     window_title = db.Column(db.String(512))
     process_name = db.Column(db.String(128))
+    url = db.Column(db.String(2048))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 

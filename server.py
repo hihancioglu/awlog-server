@@ -104,9 +104,10 @@ def receive_log():
             username=username,
             window_title=data.get("window_title"),
             process_name=data.get("process_name"),
+            url=data.get("url"),
             start_time=data.get("start_time"),
             end_time=data.get("end_time"),
-            duration=data.get("duration")
+            duration=data.get("duration"),
         )
         db.session.add(wl)
         db.session.commit()
@@ -168,6 +169,7 @@ def report_status():
         status=status,
         window_title=data.get("window_title"),
         process_name=data.get("process_name"),
+        url=data.get("url"),
     )
     db.session.add(rl)
     db.session.commit()
@@ -410,7 +412,10 @@ def get_current_status():
     )
 
     window_map = {
-        (w.username, w.hostname): w.window_title or ""
+        (w.username, w.hostname): {
+            "title": w.window_title or "",
+            "url": w.url or "",
+        }
         for w in window_q
     }
 
@@ -433,7 +438,7 @@ def get_current_status():
 
     for w in wl_q:
         pair = (w.username, w.hostname)
-        window_map.setdefault(pair, w.window_title or "")
+        window_map.setdefault(pair, {"title": w.window_title or "", "url": w.url or ""})
 
     report_map = {
         (r.username, r.hostname): {
@@ -480,7 +485,8 @@ def get_current_status():
             "status": log.status,
             "shown_status": shown_status,
             "badge": badge,
-            "window_title": window_map.get(pair, ""),
+            "window_title": window_map.get(pair, {}).get("title", ""),
+            "url": window_map.get(pair, {}).get("url", ""),
             "ip": rep.get("ip") if rep else "?",
             "today_active": active_today,
             "today_total": total_today,
@@ -507,7 +513,8 @@ def get_current_status():
             "status": rep["status"],
             "shown_status": shown_status,
             "badge": badge,
-            "window_title": window_map.get(pair, ""),
+            "window_title": window_map.get(pair, {}).get("title", ""),
+            "url": window_map.get(pair, {}).get("url", ""),
             "ip": rep.get("ip") if rep else "?",
             "today_active": int(detail.get("active", 0)),
             "today_total": int(detail.get("total", 0)),
