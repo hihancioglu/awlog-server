@@ -122,10 +122,11 @@ def _parse_version(ver: str):
     return tuple(int(x) for x in re.findall(r"\d+", ver))
 
 
-def check_for_update(auto_exit=True):
+def check_for_update(auto_exit=True, log_callback=None):
     try:
-        if LOG_CALLBACK:
-            LOG_CALLBACK("G\u00fcncelleme kontrol ediliyor...")
+        cb = log_callback or LOG_CALLBACK
+        if cb:
+            cb("G\u00fcncelleme kontrol ediliyor...")
         r = requests.get(UPDATE_JSON_URL, timeout=5)
         if r.status_code != 200:
             return False
@@ -137,8 +138,8 @@ def check_for_update(auto_exit=True):
             return False
         if _parse_version(remote_ver) <= _parse_version(AGENT_VERSION):
             return False
-        if LOG_CALLBACK:
-            LOG_CALLBACK("Dosya indiriliyor, l\u00fctfen bekleyin...")
+        if cb:
+            cb("Dosya indiriliyor, l\u00fctfen bekleyin...")
         resp = requests.get(download_url, stream=True, timeout=10)
         if resp.status_code != 200:
             return False
@@ -152,11 +153,11 @@ def check_for_update(auto_exit=True):
                 sha256.update(chunk)
         if expected_hash and sha256.hexdigest().lower() != expected_hash:
             os.remove(UPDATER_TEMP_PATH)
-            if LOG_CALLBACK:
-                LOG_CALLBACK("G\u00fcncelleme do\u011frulanamad\u0131.")
+            if cb:
+                cb("G\u00fcncelleme do\u011frulanamad\u0131, g\u00fcncellenemedi.")
             return False
-        if LOG_CALLBACK:
-            LOG_CALLBACK("G\u00fcncelleniyor, l\u00fctfen bekleyin...")
+        if cb:
+            cb("G\u00fcncelleniyor, l\u00fctfen bekleyin...")
         fd, updater_copy = tempfile.mkstemp(suffix=".exe")
         os.close(fd)
         shutil.copyfile(sys.argv[0], updater_copy)
@@ -770,7 +771,7 @@ class MainWindow(QWidget):
     def update_check_worker(self):
         """Run version check in background and enable start button when done."""
         self.logla("G\u00fcncelleme kontrol ediliyor...")
-        updated = check_for_update(auto_exit=False)
+        updated = check_for_update(auto_exit=False, log_callback=self.logla)
         if updated:
             self.logla("G\u00fcncelleme bulundu, uygulama kapat\u0131l\u0131yor...")
             os._exit(0)
