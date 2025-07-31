@@ -40,6 +40,7 @@ afk_state = False
 afk_period_start = datetime.now()
 notafk_period_start = datetime.now()
 prev_window, prev_process = None, None
+prev_url = None
 window_period_start = datetime.now()
 
 # ---- Helper functions ----
@@ -142,7 +143,7 @@ def report_status_async(status):
     threading.Thread(target=lambda: asyncio.run(_report_status(status)), daemon=True).start()
 
 
-async def _report_window(window_title, process_name):
+async def _report_window(window_title, process_name, url):
     data = {
         "username": get_username(),
         "hostname": get_hostname(),
@@ -150,6 +151,7 @@ async def _report_window(window_title, process_name):
         "status": "window",
         "window_title": window_title or "",
         "process_name": process_name or "",
+        "url": url or "",
     }
     try:
         load_secret()
@@ -168,8 +170,8 @@ async def _report_window(window_title, process_name):
         return False
 
 
-def report_window(window_title, process_name):
-    return asyncio.run(_report_window(window_title, process_name))
+def report_window(window_title, process_name, url):
+    return asyncio.run(_report_window(window_title, process_name, url))
 
 
 # ---- Logging helpers ----
@@ -202,7 +204,7 @@ def check_macro_processes() -> None:
         DEBUG("Makro programı tespit edildi: %s" % ", ".join(sorted(set(suspects))))
 
 
-def log_window_period(window_title, process_name, start_time, end_time):
+def log_window_period(window_title, process_name, url, start_time, end_time):
     duration = int((end_time - start_time).total_seconds())
     data = {
         "window_title": window_title or "",
@@ -210,6 +212,7 @@ def log_window_period(window_title, process_name, start_time, end_time):
         "start_time": start_time.isoformat(),
         "end_time": end_time.isoformat(),
         "duration": duration,
+        "url": url or "",
     }
     log_queue.put(("window", data))
 
@@ -235,9 +238,18 @@ def get_active_window_info():
         _, pid = win32process.GetWindowThreadProcessId(hwnd)
         process = psutil.Process(pid)
         process_name = process.name()
-        return window_title, process_name
+        url = None
+        try:
+            if process_name.lower() in ("chrome.exe", "msedge.exe", "firefox.exe"):
+                import uiautomation as auto
+                control = auto.ControlFromHandle(hwnd)
+                edit = control.EditControl()
+                url = edit.GetValuePattern().Value
+        except Exception:
+            url = None
+        return window_title, process_name, url
     except Exception:
-        return None, None
+        return None, None, None
 
 
 def get_idle_seconds() -> float:
@@ -270,11 +282,11 @@ def is_workstation_locked() -> bool:
 
 
 def logging_thread_func(running_flag):
-    global afk_state, afk_period_start, notafk_period_start, prev_window, prev_process, window_period_start
-    prev_window, prev_process = get_active_window_info()
+    global afk_state, afk_period_start, notafk_period_start, prev_window, prev_process, window_period_start, prev_url
+    prev_window, prev_process, prev_url = get_active_window_info()
     window_period_start = datetime.now()
     notafk_period_start = window_period_start
-    report_window(prev_window, prev_process)
+    report_window(prev_window, prev_process, prev_url)
     last_check = datetime.now()
     net_prev = psutil.net_io_counters()
 
@@ -289,8 +301,12 @@ def logging_thread_func(running_flag):
             notafk_period_start = now
         last_check = now
 
-        current_window, current_process = get_active_window_info()
-        window_changed = current_window != prev_window or current_process != prev_process
+        current_window, current_process, current_url = get_active_window_info()
+        window_changed = (
+            current_window != prev_window
+            or current_process != prev_process
+            or current_url != prev_url
+        )
 
         net_now = psutil.net_io_counters()
         net_diff = (net_now.bytes_sent - net_prev.bytes_sent) + (net_now.bytes_recv - net_prev.bytes_recv)
@@ -301,11 +317,12 @@ def logging_thread_func(running_flag):
         is_active = (not locked) and (idle <= afk_timeout or net_diff > 0 or window_changed)
 
         if window_changed:
-            log_window_period(prev_window, prev_process, window_period_start, now)
+            log_window_period(prev_window, prev_process, prev_url, window_period_start, now)
             prev_window = current_window
             prev_process = current_process
+            prev_url = current_url
             window_period_start = now
-            report_window(current_window, current_process)
+            report_window(current_window, current_process, current_url)
 
         if afk_state and is_active:
             log_status_period(afk_period_start, now, "afk")
