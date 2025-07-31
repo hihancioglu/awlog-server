@@ -857,9 +857,6 @@ class MainWindow(QWidget):
         self.status_label.setText("Durum: Bekleniyor...")
 
     def _start_workflow(self):
-        self.status_label.setText("Durum: Temizlik yapılıyor...")
-        kill_all_forticlient_processes()
-        time.sleep(2)
 
         if not vpn_connected():
             self.set_connection_status(False, False)
