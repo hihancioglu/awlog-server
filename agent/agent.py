@@ -94,6 +94,8 @@ def _parse_version(ver: str):
 
 def check_for_update(auto_exit=True):
     try:
+        if LOG_CALLBACK:
+            LOG_CALLBACK("G\u00fcncelleme kontrol ediliyor...")
         r = requests.get(UPDATE_JSON_URL, timeout=5)
         if r.status_code != 200:
             return False
@@ -105,6 +107,8 @@ def check_for_update(auto_exit=True):
             return False
         if _parse_version(remote_ver) <= _parse_version(AGENT_VERSION):
             return False
+        if LOG_CALLBACK:
+            LOG_CALLBACK("G\u00fcncelleme indiriliyor...")
         resp = requests.get(download_url, stream=True, timeout=10)
         if resp.status_code != 200:
             return False
@@ -118,13 +122,24 @@ def check_for_update(auto_exit=True):
                 sha256.update(chunk)
         if expected_hash and sha256.hexdigest().lower() != expected_hash:
             os.remove(UPDATER_TEMP_PATH)
+            if LOG_CALLBACK:
+                LOG_CALLBACK("G\u00fcncelleme do\u011frulanamad\u0131.")
             return False
-        subprocess.Popen([UPDATER_TEMP_PATH], shell=False)
+        if LOG_CALLBACK:
+            LOG_CALLBACK("G\u00fcncelleme kuruluyor...")
+        subprocess.Popen([
+            sys.executable,
+            os.path.join(os.path.dirname(__file__), "updater.py"),
+            sys.argv[0],
+            UPDATER_TEMP_PATH,
+        ])
         if auto_exit:
             os._exit(0)
         return True
     except Exception as e:
         DEBUG(f"check_for_update failed: {e}")
+        if LOG_CALLBACK:
+            LOG_CALLBACK(f"G\u00fcncelleme hatas\u0131: {e}")
     return False
 
 # Ana sunucu adresi. API çağrıları için base URL olarak kullanılır
