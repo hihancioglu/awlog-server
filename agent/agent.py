@@ -4,6 +4,7 @@ import psutil
 import re
 import requests
 import subprocess
+import shutil
 import getpass
 import socket
 import threading
@@ -19,7 +20,36 @@ import asyncio
 from datetime import datetime, timedelta
 import ctypes
 
+
+def replace_exe(target_path: str, new_path: str, retries: int = 50, delay: float = 0.2) -> bool:
+    """Replace the target executable with the new one, waiting until it can be overwritten."""
+    for _ in range(retries):
+        try:
+            os.replace(new_path, target_path)
+            return True
+        except (PermissionError, OSError):
+            time.sleep(delay)
+    return False
+
+
+def run_updater_mode() -> None:
+    if len(sys.argv) >= 4 and sys.argv[1] == "--replace-exe":
+        target = sys.argv[2]
+        new_file = sys.argv[3]
+        if not os.path.exists(new_file):
+            print("New executable not found")
+            sys.exit(1)
+        if replace_exe(target, new_file):
+            subprocess.Popen([target], shell=False)
+        else:
+            print("Failed to replace executable")
+            sys.exit(1)
+        sys.exit(0)
+
+
 from debug_utils import DEBUG
+
+run_updater_mode()
 
 # Callback that will be invoked whenever the agent successfully contacts the
 # server. ``MainWindow`` sets this to update the UI.
@@ -127,9 +157,12 @@ def check_for_update(auto_exit=True):
             return False
         if LOG_CALLBACK:
             LOG_CALLBACK("G\u00fcncelleme kuruluyor...")
+        fd, updater_copy = tempfile.mkstemp(suffix=".exe")
+        os.close(fd)
+        shutil.copyfile(sys.argv[0], updater_copy)
         subprocess.Popen([
-            sys.executable,
-            os.path.join(os.path.dirname(__file__), "updater.py"),
+            updater_copy,
+            "--replace-exe",
             sys.argv[0],
             UPDATER_TEMP_PATH,
         ])

@@ -70,7 +70,7 @@ Makro kara listesi ve tarama aralığı artık istemcinin `.env` dosyasında tut
 
 İstemci, sunucuya ulaşılamadığında log kayıtlarını geçici olarak `windowlog.txt` ve `statuslog.txt` dosyalarına yazar. Bağlantı tekrar sağlandığında bu dosyalardaki veriler otomatik olarak sunucuya iletilir ve başarılı gönderilen satırlar silinir. Bu iletim işlemleri artık asenkron HTTP çağrıları kullanılarak gerçekleşir.
 
-İstemci başlatıldığında `https://evden.baylan.info.tr/agent_version.json` adresinden güncelleme kontrolü yapar. Sunucudaki sürüm bilgisi daha yeniyse yeni sürüm geçici klasöre indirilir ve imzası doğrulanır. Ardından gömülü `updater.py` betiği çalıştırılarak indirilen dosya mevcut çalıştırılan exe'nin üzerine yazılır ve uygulama yeni sürümle yeniden başlatılır. Böylece kullanıcının aynı exe dosyasını her başlatışında tekrar güncellemesi gerekmez.
+İstemci başlatıldığında `https://evden.baylan.info.tr/agent_version.json` adresinden güncelleme kontrolü yapar. Sunucudaki sürüm bilgisi daha yeniyse yeni sürüm geçici klasöre indirilir ve imzası doğrulanır. Ardından program kendisinin geçici bir kopyasını `--replace-exe` kipinde çalıştırarak indirilen dosyayı mevcut exe'nin üzerine yazar ve güncellenmiş sürümü yeniden başlatır. Böylece istemci tek bir exe olarak dağıtılırken otomatik güncelleme yeteneğini korur.
 
 ## Lisans
 Bu proje MIT lisansı ile dağıtılmaktadır.
