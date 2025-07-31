@@ -138,7 +138,7 @@ def check_for_update(auto_exit=True):
         if _parse_version(remote_ver) <= _parse_version(AGENT_VERSION):
             return False
         if LOG_CALLBACK:
-            LOG_CALLBACK("G\u00fcncelleme indiriliyor...")
+            LOG_CALLBACK("Dosya indiriliyor, l\u00fctfen bekleyin...")
         resp = requests.get(download_url, stream=True, timeout=10)
         if resp.status_code != 200:
             return False
@@ -156,7 +156,7 @@ def check_for_update(auto_exit=True):
                 LOG_CALLBACK("G\u00fcncelleme do\u011frulanamad\u0131.")
             return False
         if LOG_CALLBACK:
-            LOG_CALLBACK("G\u00fcncelleme kuruluyor...")
+            LOG_CALLBACK("G\u00fcncelleniyor, l\u00fctfen bekleyin...")
         fd, updater_copy = tempfile.mkstemp(suffix=".exe")
         os.close(fd)
         shutil.copyfile(sys.argv[0], updater_copy)
