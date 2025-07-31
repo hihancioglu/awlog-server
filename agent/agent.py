@@ -67,7 +67,7 @@ from PyQt5.QtCore import pyqtSignal, pyqtSlot, QTimer
 # Agent uygulamasının sürüm bilgisi
 AGENT_VERSION = "1.0.0"
 # Güncelleme kontrolü için JSON dosyasının bulunduğu URL
-UPDATE_JSON_URL = "https://evden.baylan.info.tr/agent_version.json"
+UPDATE_JSON_URL = "https://evden.baylan.info.tr/static/agent_version.json"
 # İndirilecek güncelleme dosyasının geçici kaydedileceği yol
 UPDATER_TEMP_PATH = os.path.join(tempfile.gettempdir(), "updater.exe")
 
