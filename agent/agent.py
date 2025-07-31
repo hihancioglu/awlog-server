@@ -355,32 +355,41 @@ def simplify_window_title(title: str) -> str:
     return domain if domain else title
 
 
-_BROWSER_URL_CACHE: dict[int, tuple[str, float]] = {}
+_BROWSER_URL_CACHE: dict[tuple[int, int], tuple[str, float]] = {}
 
-def get_browser_url(pid: int) -> str | None:
-    """Return URL from browser's address bar using UI Automation."""
+def get_browser_url(pid: int, hwnd: int | None = None) -> str | None:
+    """Return URL from browser's address bar using UI Automation.
+
+    ``hwnd`` is used to connect directly to the active window to improve
+    reliability with multi-process browsers like Chrome/Edge.
+    """
     try:
         import pywinauto
     except Exception:
         return None
 
     now = time.time()
-    cached = _BROWSER_URL_CACHE.get(pid)
-    if cached and now - cached[1] < 3.0:
+    key = (pid, hwnd or 0)
+    cached = _BROWSER_URL_CACHE.get(key)
+    if cached and now - cached[1] < 1.0:
         return cached[0]
 
     try:
-        app = pywinauto.Application(backend="uia").connect(process=pid)
-        dlg = app.top_window()
+        if hwnd:
+            app = pywinauto.Application(backend="uia").connect(handle=hwnd)
+            dlg = app.window(handle=hwnd)
+        else:
+            app = pywinauto.Application(backend="uia").connect(process=pid)
+            dlg = app.top_window()
         for el in dlg.descendants(control_type="Edit"):
             try:
                 val = el.get_value()
                 if isinstance(val, str) and val.startswith("http"):
-                    _BROWSER_URL_CACHE[pid] = (val, now)
+                    _BROWSER_URL_CACHE[key] = (val, now)
                     return val
                 txt = el.window_text()
                 if isinstance(txt, str) and txt.startswith("http"):
-                    _BROWSER_URL_CACHE[pid] = (txt, now)
+                    _BROWSER_URL_CACHE[key] = (txt, now)
                     return txt
             except Exception:
                 continue
@@ -401,7 +410,7 @@ def get_active_window_info():
         proc_lower = process_name.lower()
         browsers = {"chrome.exe", "msedge.exe", "firefox.exe", "opera.exe", "iexplore.exe"}
         if proc_lower in browsers:
-            url = get_browser_url(pid)
+            url = get_browser_url(pid, hwnd)
             if url:
                 window_title = url
             else:
