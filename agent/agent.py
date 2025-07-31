@@ -14,6 +14,7 @@ import queue
 import json
 import hmac
 import hashlib
+from urllib.parse import urlparse
 import asyncio
 from datetime import datetime, timedelta
 import ctypes
@@ -228,6 +229,22 @@ def get_username():
     return getpass.getuser()
 
 
+def domain_from_url(url: str | None) -> str | None:
+    if not url:
+        return url
+    url = url.strip()
+    try:
+        if '://' not in url:
+            url = '//' + url
+        parsed = urlparse(url)
+        host = parsed.hostname
+        if host:
+            return host.lower()
+        return url.split('/')[0].split(':')[0].lower()
+    except Exception:
+        return url
+
+
 def load_secret():
     """Retrieve or request the per-agent secret."""
     global AGENT_SECRET
@@ -298,7 +315,7 @@ def log_window_period(window_title, process_name, url, start_time, end_time):
         "start_time": start_time.isoformat(),
         "end_time": end_time.isoformat(),
         "duration": duration,
-        "url": url or "",
+        "url": domain_from_url(url) or "",
     }
     log_queue.put(("window", data))
 
@@ -537,7 +554,7 @@ async def _report_window(window_title, process_name, url):
         "status": "window",
         "window_title": window_title or "",
         "process_name": process_name or "",
-        "url": url or "",
+        "url": domain_from_url(url) or "",
     }
     try:
         load_secret()

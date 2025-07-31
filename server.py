@@ -30,6 +30,7 @@ from awlog_server.utils import (
     login_required,
     is_admin,
     get_app_from_window,
+    domain_from_url,
 )
 
 app = create_app()
@@ -104,7 +105,7 @@ def receive_log():
             username=username,
             window_title=data.get("window_title"),
             process_name=data.get("process_name"),
-            url=data.get("url"),
+            url=domain_from_url(data.get("url")),
             start_time=data.get("start_time"),
             end_time=data.get("end_time"),
             duration=data.get("duration"),
@@ -169,7 +170,7 @@ def report_status():
         status=status,
         window_title=data.get("window_title"),
         process_name=data.get("process_name"),
-        url=data.get("url"),
+        url=domain_from_url(data.get("url")),
     )
     db.session.add(rl)
     db.session.commit()

@@ -4,6 +4,7 @@ import ldap3
 import re
 from datetime import datetime, timedelta
 from functools import wraps
+from urllib.parse import urlparse
 from flask import session, redirect, url_for, request, current_app
 
 
@@ -83,3 +84,20 @@ def get_app_from_window(title: str, process: str) -> str:
         if parts:
             return parts[0].lower()
     return proc or "unknown"
+
+
+def domain_from_url(url: str | None) -> str | None:
+    """Extract hostname from URL string."""
+    if not url:
+        return url
+    url = url.strip()
+    try:
+        if "://" not in url:
+            url = "//" + url
+        parsed = urlparse(url)
+        host = parsed.hostname
+        if host:
+            return host.lower()
+        return url.split("/")[0].split(":")[0].lower()
+    except Exception:
+        return url
