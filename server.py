@@ -19,6 +19,7 @@ import logging
 import hmac
 import hashlib
 import secrets
+import os
 from debug_utils import DEBUG
 
 from awlog_server.models import db, WindowLog, StatusLog, ReportLog, ApiLog, AgentSecret
