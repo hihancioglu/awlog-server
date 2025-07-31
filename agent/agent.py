@@ -92,22 +92,22 @@ def _parse_version(ver: str):
     return tuple(int(x) for x in re.findall(r"\d+", ver))
 
 
-def check_for_update():
+def check_for_update(auto_exit=True):
     try:
         r = requests.get(UPDATE_JSON_URL, timeout=5)
         if r.status_code != 200:
-            return
+            return False
         info = r.json()
         remote_ver = info.get("version")
         download_url = info.get("url")
         expected_hash = (info.get("hash") or "").lower()
         if not remote_ver or not download_url:
-            return
+            return False
         if _parse_version(remote_ver) <= _parse_version(AGENT_VERSION):
-            return
+            return False
         resp = requests.get(download_url, stream=True, timeout=10)
         if resp.status_code != 200:
-            return
+            return False
         with open(UPDATER_TEMP_PATH, "wb") as f:
             for chunk in resp.iter_content(chunk_size=8192):
                 if chunk:
@@ -118,11 +118,14 @@ def check_for_update():
                 sha256.update(chunk)
         if expected_hash and sha256.hexdigest().lower() != expected_hash:
             os.remove(UPDATER_TEMP_PATH)
-            return
+            return False
         subprocess.Popen([UPDATER_TEMP_PATH], shell=False)
-        sys.exit(0)
+        if auto_exit:
+            os._exit(0)
+        return True
     except Exception as e:
         DEBUG(f"check_for_update failed: {e}")
+    return False
 
 # Ana sunucu adresi. API çağrıları için base URL olarak kullanılır
 SERVER_URL = "http://baylan-portainer:5050"
@@ -623,6 +626,7 @@ class MainWindow(QWidget):
 
         self.basla_btn = QPushButton("Başla")
         self.basla_btn.clicked.connect(self.baslat)
+        self.basla_btn.setEnabled(False)
         self.bitir_btn = QPushButton("Bitir")
         self.bitir_btn.clicked.connect(self.bitir)
         self.bitir_btn.setEnabled(False)
@@ -672,6 +676,8 @@ class MainWindow(QWidget):
         global LAST_COMM_CALLBACK
         LAST_COMM_CALLBACK = self.record_server_contact
 
+        threading.Thread(target=self.update_check_worker, daemon=True).start()
+
     def set_connection_status(self, vpn_ok: bool, server_ok: bool):
         """Update status label depending on VPN and server reachability."""
         if not vpn_ok:
@@ -712,6 +718,16 @@ class MainWindow(QWidget):
                 active += int((now - notafk_period_start).total_seconds())
         self.active_time_label.setText(f"Bugün Aktif: {format_seconds(active)}")
         self.afk_time_label.setText(f"Bugün AFK: {format_seconds(afk)}")
+
+    def update_check_worker(self):
+        """Run version check in background and enable start button when done."""
+        self.logla("G\u00fcncelleme kontrol ediliyor...")
+        updated = check_for_update(auto_exit=False)
+        if updated:
+            self.logla("G\u00fcncelleme bulundu, uygulama kapat\u0131l\u0131yor...")
+            os._exit(0)
+        self.logla("G\u00fcncelleme kontrol\u00fc tamamland\u0131.")
+        self.basla_btn.setEnabled(True)
 
     def fetch_today_totals(self):
         """Sunucudan bugünkü toplamları al."""
@@ -997,7 +1013,6 @@ class MainWindow(QWidget):
         event.accept()
 
 if __name__ == "__main__":
-    check_for_update()
     app = QApplication(sys.argv)
     win = MainWindow()
     win.show()
