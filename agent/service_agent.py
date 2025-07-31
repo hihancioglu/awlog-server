@@ -224,57 +224,6 @@ def log_status_period(start_time, end_time, status):
     log_queue.put(("status", data))
 
 
-def extract_domain(title: str) -> str | None:
-    """Return domain part from a window title, if any."""
-    if not title:
-        return None
-    m = re.search(r"([A-Za-z0-9.-]+\.[A-Za-z]{2,})", title)
-    if m:
-        return m.group(1).lower()
-    return None
-
-
-_BROWSER_URL_CACHE: dict[tuple[int, int], tuple[str, float]] = {}
-
-def get_browser_url(pid: int, hwnd: int | None = None) -> str | None:
-    """Return URL from browser's address bar using UI Automation.
-
-    ``hwnd`` allows connecting directly to the active window to avoid
-    delays on browsers that spawn multiple processes.
-    """
-    try:
-        import pywinauto
-    except Exception:
-        return None
-
-    now = time.time()
-    key = (pid, hwnd or 0)
-    cached = _BROWSER_URL_CACHE.get(key)
-    if cached and now - cached[1] < 1.0:
-        return cached[0]
-
-    try:
-        if hwnd:
-            app = pywinauto.Application(backend="uia").connect(handle=hwnd)
-            dlg = app.window(handle=hwnd)
-        else:
-            app = pywinauto.Application(backend="uia").connect(process=pid)
-            dlg = app.top_window()
-        for el in dlg.descendants(control_type="Edit"):
-            try:
-                val = el.get_value()
-                if isinstance(val, str) and val.startswith("http"):
-                    _BROWSER_URL_CACHE[key] = (val, now)
-                    return val
-                txt = el.window_text()
-                if isinstance(txt, str) and txt.startswith("http"):
-                    _BROWSER_URL_CACHE[key] = (txt, now)
-                    return txt
-            except Exception:
-                continue
-    except Exception:
-        return None
-    return None
 
 
 def get_active_window_info():
@@ -286,16 +235,6 @@ def get_active_window_info():
         _, pid = win32process.GetWindowThreadProcessId(hwnd)
         process = psutil.Process(pid)
         process_name = process.name()
-        proc_lower = process_name.lower()
-        browsers = {"chrome.exe", "msedge.exe", "firefox.exe", "opera.exe", "iexplore.exe"}
-        if proc_lower in browsers:
-            url = get_browser_url(pid, hwnd)
-            if url:
-                window_title = url
-            else:
-                domain = extract_domain(window_title)
-                if domain:
-                    window_title = domain
         return window_title, process_name
     except Exception:
         return None, None
