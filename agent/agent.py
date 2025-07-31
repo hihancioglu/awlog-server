@@ -169,8 +169,6 @@ def check_for_update(auto_exit=True, log_callback=None):
         ])
         if auto_exit:
             os._exit(0)
-        else:
-            self.logla("G\u00fcncelleme bulunamad\u0131.")
         return True
     except Exception as e:
         DEBUG(f"check_for_update failed: {e}")
