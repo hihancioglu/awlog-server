@@ -82,10 +82,14 @@
     return h + ':' + String(m).padStart(2, '0');
   }
 
-  const processLabels = Object.keys(processData);
   const processValues = Object.values(processData);
-  const urlLabels = Object.keys(urlData);
+  const processLabels = Object.keys(processData).map(
+    (label, i) => label + ' (' + formatDuration(processValues[i]) + ')'
+  );
   const urlValues = Object.values(urlData);
+  const urlLabels = Object.keys(urlData).map(
+    (label, i) => label + ' (' + formatDuration(urlValues[i]) + ')'
+  );
 
   new Chart(document.getElementById('processPie'), {
     type: 'pie',
@@ -97,7 +101,7 @@
       plugins: {
         tooltip: {
           callbacks: {
-            label: ctx => ctx.label + ': ' + formatDuration(ctx.parsed)
+            label: ctx => ctx.label
           }
         }
       }
@@ -114,7 +118,7 @@
       plugins: {
         tooltip: {
           callbacks: {
-            label: ctx => ctx.label + ': ' + formatDuration(ctx.parsed)
+            label: ctx => ctx.label
           }
         }
       }
