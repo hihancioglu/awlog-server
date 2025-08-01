@@ -38,6 +38,7 @@
         <th>Başlama</th>
         <th>Bitiş</th>
         <th>Toplam Online</th>
+        <th>Offline</th>
         <th>Aktif Zaman</th>
         <th>AFK Zaman</th>
       </tr>
@@ -49,6 +50,7 @@
         <td>{{ r.start | local_time('%H:%M') if r.start }}</td>
         <td>{{ r.end | local_time('%H:%M') if r.end }}</td>
         <td>{{ format_duration(r.online) }}</td>
+        <td>{{ format_duration(r.offline) }}</td>
         <td>{{ format_duration(r.active) }}</td>
         <td>{{ format_duration(r.afk) }}</td>
       </tr>
