@@ -3,3 +3,5 @@ data/
 logs/
 server.log
 build/
+*.exe
+*.json
