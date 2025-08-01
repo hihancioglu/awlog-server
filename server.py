@@ -1096,6 +1096,14 @@ def usage_report():
         domain = domain_from_url(url)
         if domain:
             url_totals[domain] = url_totals.get(domain, 0) + int(dur or 0)
+
+    # Display only top 10 entries in pie charts
+    process_totals = dict(
+        sorted(process_totals.items(), key=lambda x: x[1], reverse=True)[:10]
+    )
+    url_totals = dict(
+        sorted(url_totals.items(), key=lambda x: x[1], reverse=True)[:10]
+    )
     if q:
         usage_rows = [
             (t, p, u, d)
