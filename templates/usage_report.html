@@ -42,11 +42,13 @@
     </div>
   </form>
   <div class="row mb-4">
-    <div class="col-md-6 mb-3 mb-md-0">
-      <canvas id="processPie"></canvas>
+    <div class="col-md-6 mb-3 mb-md-0 text-center">
+      <canvas id="processPie" width="300" height="300"></canvas>
+      <div id="processLegend" class="mt-2"></div>
     </div>
-    <div class="col-md-6">
-      <canvas id="urlPie"></canvas>
+    <div class="col-md-6 text-center">
+      <canvas id="urlPie" width="300" height="300"></canvas>
+      <div id="urlLegend" class="mt-2"></div>
     </div>
   </div>
   <table class="table table-bordered table-striped shadow">
@@ -71,6 +73,7 @@
   </table>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="{{ url_for('static', filename='simple_pie.js') }}"></script>
 <script>
   const processData = {{ process_totals | tojson }};
   const urlData = {{ url_totals | tojson }};
@@ -104,41 +107,56 @@
     chart.update();
   }
 
-  const processChart = new Chart(document.getElementById('processPie'), {
-    type: 'pie',
-    data: {
-      labels: processLabels,
-      datasets: [{ data: processValues }]
-    },
-    options: {
-      plugins: {
-        tooltip: {
-          callbacks: {
-            label: ctx => ctx.label + ': ' + formatDuration(ctx.parsed)
+  if (window.Chart) {
+    const processChart = new Chart(document.getElementById('processPie'), {
+      type: 'pie',
+      data: {
+        labels: processLabels,
+        datasets: [{ data: processValues }]
+      },
+      options: {
+        plugins: {
+          tooltip: {
+            callbacks: {
+              label: ctx => ctx.label + ': ' + formatDuration(ctx.parsed)
+            }
           }
         }
       }
-    }
-  });
-  enableLegendTooltip(processChart);
+    });
+    enableLegendTooltip(processChart);
 
-  const urlChart = new Chart(document.getElementById('urlPie'), {
-    type: 'pie',
-    data: {
-      labels: urlLabels,
-      datasets: [{ data: urlValues }]
-    },
-    options: {
-      plugins: {
-        tooltip: {
-          callbacks: {
-            label: ctx => ctx.label + ': ' + formatDuration(ctx.parsed)
+    const urlChart = new Chart(document.getElementById('urlPie'), {
+      type: 'pie',
+      data: {
+        labels: urlLabels,
+        datasets: [{ data: urlValues }]
+      },
+      options: {
+        plugins: {
+          tooltip: {
+            callbacks: {
+              label: ctx => ctx.label + ': ' + formatDuration(ctx.parsed)
+            }
           }
         }
       }
-    }
-  });
-  enableLegendTooltip(urlChart);
+    });
+    enableLegendTooltip(urlChart);
+  } else {
+    new SimplePie(
+      document.getElementById('processPie'),
+      processLabels,
+      processValues,
+      { legend: document.getElementById('processLegend'), format: formatDuration }
+    );
+    new SimplePie(
+      document.getElementById('urlPie'),
+      urlLabels,
+      urlValues,
+      { legend: document.getElementById('urlLegend'), format: formatDuration }
+    );
+  }
 </script>
 </body>
 </html>
