@@ -944,38 +944,27 @@ def get_weekly_report(username: str, week_start: date):
             .first()
         )
 
-        # Calculate offline duration for the day
-        day_logs = (
-            db.session.query(ReportLog)
-            .filter(
-                ReportLog.username == username,
-                ReportLog.created_at >= day_start,
-                ReportLog.created_at < day_end,
-            )
-            .order_by(ReportLog.created_at)
-            .all()
-        )
-        prev_log = (
-            db.session.query(ReportLog)
-            .filter(
-                ReportLog.username == username,
-                ReportLog.created_at < day_start,
-            )
-            .order_by(ReportLog.created_at.desc())
-            .first()
-        )
+        # Calculate offline duration only between start and end logs.
         offline = 0
-        if prev_log and prev_log.status == "offline":
-            next_time = day_logs[0].created_at if day_logs else day_end
-            offline += int((min(next_time, day_end) - day_start).total_seconds())
-        for idx, log in enumerate(day_logs):
-            if log.status != "offline":
-                continue
-            if idx + 1 < len(day_logs):
-                next_time = day_logs[idx + 1].created_at
-            else:
-                next_time = day_end
-            offline += int((min(next_time, day_end) - log.created_at).total_seconds())
+        if start_log and end_log and start_log.created_at < end_log.created_at:
+            logs_in_range = (
+                db.session.query(ReportLog)
+                .filter(
+                    ReportLog.username == username,
+                    ReportLog.created_at >= start_log.created_at,
+                    ReportLog.created_at <= end_log.created_at,
+                )
+                .order_by(ReportLog.created_at)
+                .all()
+            )
+            for idx, log in enumerate(logs_in_range):
+                if log.status != "offline":
+                    continue
+                if idx + 1 < len(logs_in_range):
+                    next_time = min(logs_in_range[idx + 1].created_at, end_log.created_at)
+                else:
+                    next_time = end_log.created_at
+                offline += int((next_time - log.created_at).total_seconds())
 
         results.append(
             {
