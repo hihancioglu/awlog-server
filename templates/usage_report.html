@@ -106,7 +106,9 @@
               const items = Chart.defaults.plugins.legend.labels.generateLabels(chart);
               const values = chart.data.datasets[0].data;
               items.forEach((it, idx) => {
-                it.text += ' (' + formatDuration(values[idx]) + ')';
+                const base = it.text || it.label || '';
+                const val = values[idx] || 0;
+                it.text = base + ' (' + formatDuration(val) + ')';
               });
               return items;
             }
@@ -135,7 +137,9 @@
               const items = Chart.defaults.plugins.legend.labels.generateLabels(chart);
               const values = chart.data.datasets[0].data;
               items.forEach((it, idx) => {
-                it.text += ' (' + formatDuration(values[idx]) + ')';
+                const base = it.text || it.label || '';
+                const val = values[idx] || 0;
+                it.text = base + ' (' + formatDuration(val) + ')';
               });
               return items;
             }
