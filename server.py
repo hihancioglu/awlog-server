@@ -944,10 +944,44 @@ def get_weekly_report(username: str, week_start: date):
             .first()
         )
 
+        # Calculate offline duration for the day
+        day_logs = (
+            db.session.query(ReportLog)
+            .filter(
+                ReportLog.username == username,
+                ReportLog.created_at >= day_start,
+                ReportLog.created_at < day_end,
+            )
+            .order_by(ReportLog.created_at)
+            .all()
+        )
+        prev_log = (
+            db.session.query(ReportLog)
+            .filter(
+                ReportLog.username == username,
+                ReportLog.created_at < day_start,
+            )
+            .order_by(ReportLog.created_at.desc())
+            .first()
+        )
+        offline = 0
+        if prev_log and prev_log.status == "offline":
+            next_time = day_logs[0].created_at if day_logs else day_end
+            offline += int((min(next_time, day_end) - day_start).total_seconds())
+        for idx, log in enumerate(day_logs):
+            if log.status != "offline":
+                continue
+            if idx + 1 < len(day_logs):
+                next_time = day_logs[idx + 1].created_at
+            else:
+                next_time = day_end
+            offline += int((min(next_time, day_end) - log.created_at).total_seconds())
+
         results.append(
             {
                 "date": day_str,
                 "online": int(total_online),
+                "offline": int(offline),
                 "active": int(active),
                 "afk": int(afk),
                 "start": start_log.created_at if start_log else None,
@@ -977,12 +1011,13 @@ def generate_all_weekly_tables():
             f"<td>{local_time(r['start'], '%H:%M') if r['start'] else ''}</td>"
             f"<td>{local_time(r['end'], '%H:%M') if r['end'] else ''}</td>"
             f"<td>{format_duration(r['online'])}</td>"
+            f"<td>{format_duration(r['offline'])}</td>"
             f"<td>{format_duration(r['active'])}</td>"
             f"<td>{format_duration(r['afk'])}</td></tr>"
             for r in rows
         )
         tables.append(
-            f"<h4>{username}</h4><table class=\"table table-bordered table-striped shadow\"><thead class=\"table-dark\"><tr><th>Tarih</th><th>Başlama</th><th>Bitiş</th><th>Toplam Online</th><th>Aktif Zaman</th><th>AFK Zaman</th></tr></thead><tbody>{table_rows}</tbody></table>"
+            f"<h4>{username}</h4><table class=\"table table-bordered table-striped shadow\"><thead class=\"table-dark\"><tr><th>Tarih</th><th>Başlama</th><th>Bitiş</th><th>Toplam Online</th><th>Offline</th><th>Aktif Zaman</th><th>AFK Zaman</th></tr></thead><tbody>{table_rows}</tbody></table>"
         )
     return "".join(tables)
 
