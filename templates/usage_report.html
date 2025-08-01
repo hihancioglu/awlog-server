@@ -6,10 +6,11 @@
     <style>
         body { background: #f6f6fa; }
         .container { max-width: 900px; margin-top: 40px; }
-        table { font-size: 15px; word-break: break-word; }
+        table { font-size: 15px; word-break: break-word; table-layout: fixed; }
         th:nth-child(2), td:nth-child(2) { min-width: 150px; }
         th:nth-child(3), td:nth-child(3) { min-width: 200px; }
         th:nth-child(4), td:nth-child(4) { min-width: 80px; white-space: nowrap; }
+        .chart-container { min-height: 360px; }
         h2 { margin-bottom: 20px; }
     </style>
 </head>
@@ -45,10 +46,10 @@
     </div>
   </form>
   <div class="row mb-4">
-    <div class="col-md-6 mb-3 mb-md-0">
+    <div class="col-md-6 mb-3 mb-md-0 chart-container">
       <canvas id="processPie"></canvas>
     </div>
-    <div class="col-md-6">
+    <div class="col-md-6 chart-container">
       <canvas id="urlPie"></canvas>
     </div>
   </div>
@@ -99,7 +100,9 @@
       datasets: [{ data: processValues }]
     },
     options: {
+      maintainAspectRatio: false,
       plugins: {
+        legend: { position: 'bottom' },
         tooltip: {
           callbacks: {
             label: ctx => ctx.label + ': ' + formatDuration(ctx.parsed)
@@ -116,7 +119,9 @@
       datasets: [{ data: urlValues }]
     },
     options: {
+      maintainAspectRatio: false,
       plugins: {
+        legend: { position: 'bottom' },
         tooltip: {
           callbacks: {
             label: ctx => ctx.label + ': ' + formatDuration(ctx.parsed)
