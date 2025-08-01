@@ -46,14 +46,16 @@
       <tr>
         <th>Pencere</th>
         <th>Process</th>
+        <th>URL</th>
         <th>Süre</th>
       </tr>
     </thead>
     <tbody>
-      {% for title, proc, dur in usage_rows %}
+      {% for title, proc, url, dur in usage_rows %}
       <tr>
         <td>{{ title }}</td>
         <td>{{ proc }}</td>
+        <td>{{ url }}</td>
         <td>{{ format_duration(dur) }}</td>
       </tr>
       {% endfor %}
