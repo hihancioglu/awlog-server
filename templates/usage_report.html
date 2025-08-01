@@ -87,7 +87,24 @@
   const urlLabels = Object.keys(urlData);
   const urlValues = Object.values(urlData);
 
-  new Chart(document.getElementById('processPie'), {
+  function enableLegendTooltip(chart) {
+    const legend = chart.options.plugins.legend || {};
+    legend.onHover = (e, item) => {
+      chart.tooltip.setActiveElements(
+        [{ datasetIndex: item.datasetIndex ?? 0, index: item.index }],
+        { x: e.clientX, y: e.clientY }
+      );
+      chart.update();
+    };
+    legend.onLeave = () => {
+      chart.tooltip.setActiveElements([], { x: 0, y: 0 });
+      chart.update();
+    };
+    chart.options.plugins.legend = legend;
+    chart.update();
+  }
+
+  const processChart = new Chart(document.getElementById('processPie'), {
     type: 'pie',
     data: {
       labels: processLabels,
@@ -103,8 +120,9 @@
       }
     }
   });
+  enableLegendTooltip(processChart);
 
-  new Chart(document.getElementById('urlPie'), {
+  const urlChart = new Chart(document.getElementById('urlPie'), {
     type: 'pie',
     data: {
       labels: urlLabels,
@@ -120,6 +138,7 @@
       }
     }
   });
+  enableLegendTooltip(urlChart);
 </script>
 </body>
 </html>
