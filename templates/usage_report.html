@@ -6,7 +6,7 @@
     <style>
         body { background: #f6f6fa; }
         .container { max-width: 900px; margin-top: 40px; }
-        table { font-size: 15px; }
+        table { font-size: 15px; word-break: break-word; }
         h2 { margin-bottom: 20px; }
     </style>
 </head>
@@ -49,6 +49,7 @@
       <canvas id="urlPie"></canvas>
     </div>
   </div>
+  <div class="table-responsive">
   <table class="table table-bordered table-striped shadow">
     <thead class="table-dark">
       <tr>
@@ -69,6 +70,7 @@
       {% endfor %}
     </tbody>
   </table>
+  </div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script>
