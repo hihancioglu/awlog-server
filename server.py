@@ -1086,6 +1086,16 @@ def usage_report():
 
     q = request.args.get("q", "").strip().lower()
     usage_rows = get_window_usage_data(selected_user, start.isoformat(), end.isoformat())
+
+    # Aggregate totals for pie charts
+    process_totals: dict[str, int] = {}
+    url_totals: dict[str, int] = {}
+    for _title, proc, url, dur in usage_rows:
+        key = proc or "other"
+        process_totals[key] = process_totals.get(key, 0) + int(dur or 0)
+        domain = domain_from_url(url)
+        if domain:
+            url_totals[domain] = url_totals.get(domain, 0) + int(dur or 0)
     if q:
         usage_rows = [
             (t, p, u, d)
@@ -1104,6 +1114,8 @@ def usage_report():
         usage_rows=usage_rows,
         format_duration=format_duration,
         q=q,
+        process_totals=process_totals,
+        url_totals=url_totals,
     )
 
 

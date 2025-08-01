@@ -41,6 +41,14 @@
       <button class="btn btn-primary" type="submit">Göster</button>
     </div>
   </form>
+  <div class="row mb-4">
+    <div class="col-md-6 mb-3 mb-md-0">
+      <canvas id="processPie"></canvas>
+    </div>
+    <div class="col-md-6">
+      <canvas id="urlPie"></canvas>
+    </div>
+  </div>
   <table class="table table-bordered table-striped shadow">
     <thead class="table-dark">
       <tr>
@@ -62,5 +70,56 @@
     </tbody>
   </table>
 </div>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+  const processData = {{ process_totals | tojson }};
+  const urlData = {{ url_totals | tojson }};
+
+  function formatDuration(sec) {
+    sec = Math.round(sec || 0);
+    const h = Math.floor(sec / 3600);
+    const m = Math.floor((sec % 3600) / 60);
+    return h + ':' + String(m).padStart(2, '0');
+  }
+
+  const processLabels = Object.keys(processData);
+  const processValues = Object.values(processData);
+  const urlLabels = Object.keys(urlData);
+  const urlValues = Object.values(urlData);
+
+  new Chart(document.getElementById('processPie'), {
+    type: 'pie',
+    data: {
+      labels: processLabels,
+      datasets: [{ data: processValues }]
+    },
+    options: {
+      plugins: {
+        tooltip: {
+          callbacks: {
+            label: ctx => ctx.label + ': ' + formatDuration(ctx.parsed)
+          }
+        }
+      }
+    }
+  });
+
+  new Chart(document.getElementById('urlPie'), {
+    type: 'pie',
+    data: {
+      labels: urlLabels,
+      datasets: [{ data: urlValues }]
+    },
+    options: {
+      plugins: {
+        tooltip: {
+          callbacks: {
+            label: ctx => ctx.label + ': ' + formatDuration(ctx.parsed)
+          }
+        }
+      }
+    }
+  });
+</script>
 </body>
 </html>
