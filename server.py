@@ -241,11 +241,12 @@ def window_usage():
 
 
 def get_window_usage_data(username: str, start_date: str, end_date: str):
-    """Return window usage grouped by title and process."""
+    """Return window usage grouped by title, process and URL."""
     q = (
         db.session.query(
             WindowLog.window_title,
             WindowLog.process_name,
+            WindowLog.url,
             func.sum(WindowLog.duration).label("total_duration"),
         )
         .filter(
@@ -253,13 +254,13 @@ def get_window_usage_data(username: str, start_date: str, end_date: str):
             func.substr(WindowLog.start_time, 1, 10) >= start_date,
             func.substr(WindowLog.start_time, 1, 10) <= end_date,
         )
-        .group_by(WindowLog.window_title, WindowLog.process_name)
+        .group_by(WindowLog.window_title, WindowLog.process_name, WindowLog.url)
         .order_by(func.sum(WindowLog.duration).desc())
     )
 
     return [
-        (title or "", proc or "", int(dur or 0))
-        for title, proc, dur in q
+        (title or "", proc or "", url or "", int(dur or 0))
+        for title, proc, url, dur in q
     ]
 
 
@@ -1087,9 +1088,11 @@ def usage_report():
     usage_rows = get_window_usage_data(selected_user, start.isoformat(), end.isoformat())
     if q:
         usage_rows = [
-            (t, p, d)
-            for t, p, d in usage_rows
-            if q in (t or "").lower() or q in (p or "").lower()
+            (t, p, u, d)
+            for t, p, u, d in usage_rows
+            if q in (t or "").lower()
+            or q in (p or "").lower()
+            or q in (u or "").lower()
         ]
 
     return render_template(
