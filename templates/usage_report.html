@@ -99,6 +99,18 @@
           callbacks: {
             label: ctx => ctx.label + ': ' + formatDuration(ctx.parsed)
           }
+        },
+        legend: {
+          labels: {
+            generateLabels: chart => {
+              const items = Chart.defaults.plugins.legend.labels.generateLabels(chart);
+              const values = chart.data.datasets[0].data;
+              items.forEach((it, idx) => {
+                it.text += ' (' + formatDuration(values[idx]) + ')';
+              });
+              return items;
+            }
+          }
         }
       }
     }
@@ -115,6 +127,18 @@
         tooltip: {
           callbacks: {
             label: ctx => ctx.label + ': ' + formatDuration(ctx.parsed)
+          }
+        },
+        legend: {
+          labels: {
+            generateLabels: chart => {
+              const items = Chart.defaults.plugins.legend.labels.generateLabels(chart);
+              const values = chart.data.datasets[0].data;
+              items.forEach((it, idx) => {
+                it.text += ' (' + formatDuration(values[idx]) + ')';
+              });
+              return items;
+            }
           }
         }
       }
