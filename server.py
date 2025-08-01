@@ -1120,6 +1120,14 @@ def usage_report():
         domain = domain_from_url(url)
         if domain:
             url_totals[domain] = url_totals.get(domain, 0) + int(dur or 0)
+
+    # Keep only top 20 entries for the pie charts
+    process_totals = dict(
+        sorted(process_totals.items(), key=lambda x: x[1], reverse=True)[:20]
+    )
+    url_totals = dict(
+        sorted(url_totals.items(), key=lambda x: x[1], reverse=True)[:20]
+    )
     if q:
         usage_rows = [
             (t, p, u, d)
